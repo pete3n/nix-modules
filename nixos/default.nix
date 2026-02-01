@@ -1,6 +1,6 @@
 { ... }:
 {
-	imports = [
-		./power-management/lidmond.nix
-	];
+  imports = [
+    ./power-management/lidmond.nix
+  ];
 }
