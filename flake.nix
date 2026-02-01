@@ -34,7 +34,7 @@
 
 			# Default merge all generic modules
       default = lib.mkMerge [
-        (importModule ./home-manager/power-management/hyprlidmon.nix)
+        (importModule ./home-manager/linux/power-management/hyprlidmon.nix)
       ];
     };
   };
