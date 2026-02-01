@@ -28,18 +28,17 @@
         ];
       };
 
-      homeManagerModules = {
-				# Cross-platform
+			homeManagerModules = {
+				# Cross-platform HM modules bundle (optional)
 				default = importModule ./home-manager/default.nix;
-        linux = {
-					# Merge all generic linux modules
-					default = lib.mkMerge [
-						(importModule ./home-manager/linux/power-management/hyprlidmon.nix)
-					];
-          power-management = {
-            hyprlidmon = importModule ./home-manager/linux/power-management/hyprlidmon.nix;
-          };
-        };
-      };
+
+				linux = {
+					default = importModule ./home-manager/linux/default.nix;
+
+					power-management = {
+						hyprlidmon = importModule ./home-manager/linux/power-management/hyprlidmon.nix;
+					};
+				};
+			};
     };
 }
