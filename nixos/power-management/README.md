@@ -9,7 +9,7 @@ A systemd laptop lid monitor dameon that runs customizable commands when the lid
 opens and closes.
 
 ### lidmond usage
-Follow the [repo instructions](https://github.com/pete3n/nix-modules) for adding the module inputs to your flake.
+Follow the [repo instructions](https://github.com/pete3n/nix-modules) to add the module inputs to your flake.
 Once added and imported in your system configuration, you can enable lidmond with:
 ### configuration.nix:
 ```
