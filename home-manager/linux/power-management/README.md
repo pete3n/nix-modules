@@ -1,6 +1,7 @@
 # Nix Home-manager Linux Power-Management Modules
 Power management is one of the bigger struggles I have had using a laptop with
-with NixOS. 
+with NixOS. These are Nix Home-manager modules for Linux that attempt to solve
+some of the issues I have encountered with power management.
 
 ## hyprlidmon
 A systemd laptop lid monitor dameon that runs customizable commands when the lid
