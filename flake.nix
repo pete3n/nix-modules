@@ -4,13 +4,15 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
 
   outputs =
-    { nixpkgs, ... }:
+    { ... }:
     let
-      lib = nixpkgs.lib;
       importModule = path: import path;
     in
     {
       nixosModules = {
+        # Default all generic modules
+        default = importModule ./nixos/default.nix;
+        
         power-management = {
           lidmond = importModule ./nixos/power-management/lidmond.nix;
         };
@@ -18,14 +20,9 @@
         # Hardware specific modules
         hardware = {
           framework16 = {
-            kbd-alsd = importModule ./nixos/hardware/framework16/fw16-kbd-alsd.nix;
+            fw16-kbd-alsd = importModule ./nixos/hardware/framework16/fw16-kbd-alsd.nix;
           };
         };
-
-        # Default merge all generic modules
-        default = lib.mkMerge [
-          (importModule ./nixos/power-management/lidmond.nix)
-        ];
       };
 
 			homeManagerModules = {
