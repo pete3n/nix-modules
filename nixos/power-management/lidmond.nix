@@ -10,7 +10,7 @@ let
 
   backlightDevice = if cfg.backlightDevice == null then "" else cfg.backlightDevice;
 
-  hyprLmd =
+  lidmond =
     pkgs.writeShellScriptBin "lidmond" # sh
       ''
         set -eu
@@ -463,10 +463,10 @@ in
       description = "Hypr lid monitor (custom lid event handler)";
       wantedBy = [ "multi-user.target" ];
       after = [ "multi-user.target" ];
-      path = [ hyprLmd ];
+      path = [ lidmond ];
       serviceConfig = {
         Type = "simple";
-        ExecStart = "${hyprLmd}/bin/lidmond";
+        ExecStart = "${lidmond}/bin/lidmond";
         Restart = "always";
         RestartSec = 1;
 				UMask = "0027"; # Mask for group rx, owner rwx
