@@ -66,3 +66,20 @@ the backlight is consistently hopping between brightness, try increasing this va
 *batteryOnly* -- Only apply ambient light settings when the laptop is on battery.
 
 *acDefault* -- Default brightness to apply when not running on battery.
+
+## fw16-disable-wake-triggers
+A one-shot systemd service to disable all wake sources except the power button.
+Prevent premature wakeup from suspend. This may work with other model frameworks
+but I have only tested this on a Framework16 with a Ryzen AI 300 mainboard. 
+
+### fw16-disable-wake-triggers
+Follow the [repo instructions](https://github.com/pete3n/nix-modules) to add the module inputs to your flake.
+Once added and imported in your system configuration, you can enable fw16-disable-wake-triggers with:
+### configuration.nix:
+```
+services.fw16-disable-wake-triggers = {
+    enable = true;
+};
+```
+There are no additional options. The service runs once at boot and 
+disables everything but the power button for suspend resume until a reboot.
