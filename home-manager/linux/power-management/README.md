@@ -54,7 +54,7 @@ services.lidmond = {
 *eventDir* -- This is the directory that lidmond writes lid events to. *Do not*
 change this path unless you have modified lidmond to write to a different directory. 
 *NOTE:* your user must be in a group that has read permissions to this directory for 
-hyprlidmon to function. This can be configured with the lidmond accessGroup option. 
+hyprlidmon to function. This can be configured with the [lidmond accessGroup](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/power-management#lidmond-customizable-options) option. 
 
 *lidClosedDefaultCmd* -- If no rule conditions match when the lid is closed, or there are
 no conditions defined, then this command will be executed.
