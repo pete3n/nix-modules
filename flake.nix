@@ -12,7 +12,7 @@
       nixosModules = {
         # Default all generic modules
         default = importModule ./nixos/default.nix;
-        
+
         power-management = {
           lidmond = importModule ./nixos/power-management/lidmond.nix;
         };
@@ -21,21 +21,22 @@
         hardware = {
           framework16 = {
             fw16-kbd-alsd = importModule ./nixos/hardware/framework16/fw16-kbd-alsd.nix;
+            fw16-disable-wake-triggers = importModule ./nixos/hardware/framework16/fw16-disable-wake-triggers.nix;
           };
         };
       };
 
-			homeManagerModules = {
-				# Cross-platform HM modules bundle (optional)
-				default = importModule ./home-manager/default.nix;
+      homeManagerModules = {
+        # Cross-platform HM modules bundle (optional)
+        default = importModule ./home-manager/default.nix;
 
-				linux = {
-					default = importModule ./home-manager/linux/default.nix;
+        linux = {
+          default = importModule ./home-manager/linux/default.nix;
 
-					power-management = {
-						hyprlidmon = importModule ./home-manager/linux/power-management/hyprlidmon.nix;
-					};
-				};
-			};
+          power-management = {
+            hyprlidmon = importModule ./home-manager/linux/power-management/hyprlidmon.nix;
+          };
+        };
+      };
     };
 }
