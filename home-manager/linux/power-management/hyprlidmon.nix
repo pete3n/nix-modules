@@ -32,8 +32,8 @@ let
       ''
 				set -eu
 
-				EVENT_DIR=${lib.escapeShellArg cfg.eventDir}
-				POLL=${lib.escapeShellArg (toString cfg.pollIntervalSeconds)}
+				EVENT_DIR=${cfg.eventDir}
+				POLL=${toString cfg.pollIntervalSeconds}
 
 				STATE_DIR="''${XDG_STATE_HOME:-$HOME/.local/state}/hyprlidmon"
 				LAST_FILE="$STATE_DIR/last_seen"
@@ -42,9 +42,9 @@ let
 				mkdir -p "$STATE_DIR"
 				[ -e "$OPEN_CMDS_FILE" ] || : > "$OPEN_CMDS_FILE"
 
-				INT_CFG=${lib.escapeShellArg cfg.intDisplay}
+				INT_CFG=${cfg.intDisplay}
 				INT_DISP_FILE="$STATE_DIR/int_display"
-				INT_DISP=${lib.escapeShellArg cfg.intDisplay}
+				INT_DISP=${cfg.intDisplay}
 
 				ts=""
 				event=""
@@ -63,12 +63,9 @@ let
 				detect_internal() {
 					_mons="$(${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null)" || return 1
 
-					_int="$(printf '%s' "$_mons" \
-						| ${pkgs.jq}/bin/jq -r '
-								[ .[] | select(.disabled == false) | .name ] 
-								| map(select(test("^eDP-"))) 
-								| .[0] // empty
-							' 2>/dev/null)" || true
+					_int="$(printf '%s' "$_mons" | ${pkgs.jq}/bin/jq -r '
+						[ .[] | .name ] | map(select(test("^(eDP|LVDS)-"))) | .[0] // empty
+					' 2>/dev/null)" || true
 					[ -n "$_int" ] && printf '%s\n' "$_int" && return 0
 
 					_int="$(printf '%s' "$_mons" \
@@ -96,10 +93,20 @@ let
 						return 0
 					fi
 
-					# Check state file first
+					# Check state file first, but validate it against current monitors
 					if [ -r "$INT_DISP_FILE" ]; then
 						_cached="$(cat "$INT_DISP_FILE" 2>/dev/null || true)"
-						[ -n "$_cached" ] && printf '%s\n' "$_cached" && return 0
+						if [ -n "$_cached" ]; then
+							if ${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null \
+								| ${pkgs.jq}/bin/jq -e --arg i "$_cached" 'any(.[]; .name == $i)' >/dev/null 2>&1
+							then
+								printf '%s\n' "$_cached"
+								return 0
+							else
+								log "cached internal display '$_cached' not present; re-detecting"
+								rm -f "$INT_DISP_FILE" || true
+							fi
+						fi
 					fi
 
 					if _det="$(detect_internal 2>/dev/null || true)"; then
