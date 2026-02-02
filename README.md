@@ -7,21 +7,27 @@ hardware specific quirks for Framework computers. Most of the Home-manager modul
 for use with Hyprland. I will add Nix-Darwin and cross-platform modules in the future.
 
 ## NixOS Modules
-- [lidmond](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/power-management) -- *Lid monitor daemon*: A systemd service designed to replace logind with 
+- [lidmond](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/power-management#lidmond) -- *Lid monitor daemon*: A systemd service designed to replace logind with 
 more customizable and flexible control. 
     - *Why?* Because I wanted to only turn off the laptop display when I closed the lid 
     and was on AC power, but I wanted to suspend the laptop when I closed the lid when 
     on battery power, regardless of if I was in a Wayland or Xorg session. 
     I couldn't find a good implementation with existing services, so I made my own.
 
-- [fw16-kbd-alsd](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/hardware/framework16) -- *Framework16 keyboard ambient light sensor daemon*: 
+- [fw16-kbd-alsd](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/hardware/framework16#fw16-kbd-alsd) -- *Framework16 keyboard ambient light sensor daemon*: 
 A systemd service to automate control of the keyboard backlight based on ambient lighting,
 battery status, and lid status.
     - *Why?*  Because I wanted automatically control the keyboard backlight to save power
     when on battery (I need a backlight when it is dark, not when it is sunny). 
 
+- [fw16-disable-wake-triggers](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/hardware/framework16#fw16-disable-wake-triggers) -- *Framework16 disable wake triggers service*: 
+A one-shot systemd service to disable all wakeup sources except the power button.
+    - *Why?* My laptop was constantly waking up prematurely from suspend from from sources
+    that I couldn't isolate, so I disabled all of them.
+
 ## Home-manager Modules
-- [hyprlidmon](https://github.com/pete3n/nix-modules/tree/nixos-25.11/home-manager/linux/power-management) -- *Hyprland lid monitor*: The Home-manager service companion for lidmond.
+- [hyprlidmon](https://github.com/pete3n/nix-modules/tree/nixos-25.11/home-manager/linux/power-management#hyprlidmon) -- *Hyprland lid monitor*: The Home-manager service companion for lidmond.
+
     - *Why?*  Because I wanted to disable the internal display on my laptop when 
     I closed the lid while on AC power with an external display connected, like
     a docking station. But if I didn't have an external display connected, I wanted
