@@ -325,7 +325,7 @@ in
 			'';
     };
 
-    shudownTtyMsg = mkOption {
+    shutdownTtyMsg = mkOption {
       type = types.str;
       default = "Battery critically low. Shutting down system...";
       description = ''
