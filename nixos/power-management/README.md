@@ -1,7 +1,7 @@
 # NixOS Power-Management Modules
 Power management is one of the bigger struggles I have had using a laptop with
 with NixOS. These modules provide some solutions I have created to provide better
-power management control. There are also [hardware](https://github.com/pete3n/nix-modules/tree/nixos-25.11/hardware) specific modules that address power
+power management control. There are also [hardware](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/hardware) specific modules that address power
 issues as well.
 
 ## lidmond
