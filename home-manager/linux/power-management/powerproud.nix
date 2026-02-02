@@ -13,13 +13,6 @@ let
     types
     ;
 
-  hasPPD =
-    config ? services
-    && config.services ? "power-profiles-daemon"
-    && config.services."power-profiles-daemon" ? enable;
-
-  ppdEnabled = hasPPD && config.services."power-profiles-daemon".enable;
-  
 	cfg = config.services."powerproud";
   powerproud =
     pkgs.writeShellScriptBin "powerproud" # sh
@@ -34,6 +27,10 @@ let
 
 				bat_dir=""
 				bat_state=""
+
+				ppd_is_active() {
+					${pkgs.systemd}/bin/systemctl is-active --quiet power-profiles-daemon.service >/dev/null 2>&1
+				}
 
 				log() {
 					${lib.optionalString cfg.logEvents #sh 
@@ -66,7 +63,7 @@ let
 				get_bat_state() {
 					[ -n "$bat_dir" ] || { printf 'unknown\n'; return 0; }
 
-					_state="$(cat "$bat_dir/status" 2>/dev/null || true)"
+					_state="$(${pkgs.coreutils}/bin/cat "$bat_dir/status" 2>/dev/null || true)"
 					case "$_state" in
 						Discharging) printf 'discharging\n' ;;
 						Charging|Full) printf 'charging\n' ;;
@@ -79,47 +76,78 @@ let
 					_max=$(${pkgs.brightnessctl}/bin/brightnessctl m)
 					# Error state, prevent div by zero when max is zero
 					[ "$_max" -gt 0 ] || { printf '0\n'; return 0; }
-					printf "%s\n" $(( _cur * 100 / _max ))
+					printf "%s\n" "$(( _cur * 100 / _max ))"
         }
 
-        discharging_actions() {
-					_cur_percent=$(get_brightness_percent)
-					if [ "$_cur_percent" -gt "$ON_BATTERY_BRIGHTNESS" ]; then 
+				set_discharging_brightness() {
+					_target="$1"
+					_cur="$(get_brightness_percent)"
 
-						if ${pkgs.brightnessctl}/bin/brightnessctl s "$ON_BATTERY_BRIGHTNESS%" >/dev/null 2>&1; then
-							log "discharging" "brightnessctl s $ON_BATTERY_BRIGHTNESS%"
-						else
-							log "discharging" "brightnessctl s $ON_BATTERY_BRIGHTNESS% (failed)"
-						fi
+					# Only dim if we're brighter than desired
+					[ "$_cur" -le "$_target" ] && return 0
+
+					if ${pkgs.brightnessctl}/bin/brightnessctl s "''${_target}%" >/dev/null 2>&1; then
+						log "$bat_state" "brightnessctl s ''${_target}% (was ''${_cur}%)"
+					else
+						log "$bat_state" "brightnessctl s ''${_target}% (was ''${_cur}%) (failed)"
+					fi
+				}
+
+				set_charging_brightness() {
+					_target="$1"
+					_cur="$(get_brightness_percent)"
+
+					# Only brighten if we're dimmer than desired
+					[ "$_cur" -ge "$_target" ] && return 0
+
+					if ${pkgs.brightnessctl}/bin/brightnessctl s "''${_target}%" >/dev/null 2>&1; then
+						log "$bat_state" "brightnessctl s ''${_target}% (was ''${_cur}%)"
+					else
+						log "$bat_state" "brightnessctl s ''${_target}% (was ''${_cur}%) (failed)"
+					fi
+				}
+
+				get_ppd_profile() {
+					# Returns: power-saver | balanced | performance | unknown
+					${pkgs.power-profiles-daemon}/bin/powerprofilesctl get 2>/dev/null || printf 'unknown\n'
+				}
+
+				set_ppd_profile() {
+					_desired="$1"
+
+					if ! ppd_is_active; then
+						log "$bat_state" "powerprofiles-daemon inactive; skip profile=$_desired"
+						return 0
 					fi
 
-					if ${pkgs.power-profiles-daemon}/bin/powerprofilesctl set "$ON_BATTERY_PROFILE" >/dev/null 2>&1; then
-						log "discharging" "powerprofilesctl set $ON_BATTERY_PROFILE"
-					else
-						log "discharging" "powerprofilesctl set $ON_BATTERY_PROFILE (failed)"
-					fi
-        }
+					_current="$(get_ppd_profile)"
 
-        charging_actions() {
-					if ${pkgs.power-profiles-daemon}/bin/powerprofilesctl set "$ON_AC_PROFILE" >/dev/null 2>&1; then
-						log "charging" "powerprofiles set $ON_AC_PROFILE"
+					# If already correct, do nothing (and don't log).
+					[ "$_current" = "$_desired" ] && return 0
+
+					if ${pkgs.power-profiles-daemon}/bin/powerprofilesctl set "$_desired" >/dev/null 2>&1; then
+						log "$bat_state" "powerprofilesctl set $_desired (was $_current)"
 					else
-						log "charging" "powerprofiles set $ON_AC_PROFILE (failed)"
+						log "$bat_state" "powerprofilesctl set $_desired (was $_current) (failed)"
 					fi
-				
-					if ${pkgs.brightnessctl}/bin/brightnessctl s "$ON_AC_BRIGHTNESS%" >/dev/null 2>&1; then
-						log "charging" "brightnessctl s $ON_AC_BRIGHTNESS%"
-					else
-						log "charging" "brightnessctl s $ON_AC_BRIGHTNESS% (failed)"
-					fi
-        }
+				}
+
+				if ! ppd_is_active; then
+					log "unknown" "power-profiles-daemon inactive; will manage brightness only"
+				fi
 
 				# Get initial state
 				init_battery_dir || exit 0 # Exit on no battery
 				bat_state="$(get_bat_state)"
 				case "$bat_state" in
-					discharging) discharging_actions ;;
-					charging)    charging_actions ;;
+					discharging)
+						set_discharging_brightness "$ON_BATTERY_BRIGHTNESS"
+						set_ppd_profile "$ON_BATTERY_PROFILE"
+						;;
+					charging)
+						set_charging_brightness "$ON_AC_BRIGHTNESS"
+						set_ppd_profile "$ON_AC_PROFILE"
+						;;
 				esac
 
 				while ${pkgs.coreutils}/bin/sleep "$BAT_POLL_INTERVAL"; do
@@ -135,8 +163,14 @@ let
 					bat_state="$_new_state"
 
 					case "$bat_state" in
-						discharging) discharging_actions ;;
-						charging)    charging_actions ;;
+						discharging)
+							set_discharging_brightness "$ON_BATTERY_BRIGHTNESS"
+							set_ppd_profile "$ON_BATTERY_PROFILE"
+							;;
+						charging)
+							set_charging_brightness "$ON_AC_BRIGHTNESS"
+							set_ppd_profile "$ON_AC_PROFILE"
+							;;
 					esac
 				done
       '';
@@ -219,18 +253,6 @@ in
   };
 
   config = mkIf cfg.enable {
-		assertions = [
-			{
-				assertion = (!hasPPD) || ppdEnabled;
-				message = ''
-					powerproud requires the system service power-profiles-daemon.
-
-					Enable it in your NixOS configuration:
-						services.power-profiles-daemon.enable = true;
-				'';
-			}
-		];
-
     home.packages = [
       powerproud
     ];
