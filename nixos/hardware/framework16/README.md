@@ -9,11 +9,17 @@ laptop lid closes.
 
 ### fw16-kbd-alsd usage
 Follow the [repo instructions](https://github.com/pete3n/nix-modules) to add the module inputs to your flake.
-Once added and imported in your system configuration, you can enable fw16-kbd-alsd with:
+Once added, import it in system configuration and enable it with:
 ### configuration.nix:
 ```
-services.fw16-kbd-alsd = {
-    enable = true;
+{ inputs, ... }:
+{
+    imports = [
+        inputs.pete3n-mods.nixosModules.hardware.framework16.fw16-kbd-alsd
+    ];
+
+    services.fw16-kbd-alsd = {
+        enable = true;
 };
 ```
 This is all that is necessary to use the default configuration. 
@@ -74,12 +80,19 @@ but I have only tested this on a Framework16 with a Ryzen AI 300 mainboard.
 
 ### fw16-disable-wake-triggers
 Follow the [repo instructions](https://github.com/pete3n/nix-modules) to add the module inputs to your flake.
-Once added and imported in your system configuration, you can enable fw16-disable-wake-triggers with:
+Once added, import it in system configuration and enable it with:
 ### configuration.nix:
 ```
-services.fw16-disable-wake-triggers = {
-    enable = true;
-};
+{ inputs, ... }:
+{
+    imports = [
+        inputs.pete3n-mods.nixosModules.hardware.framework16.fw16-disable-wake-triggers
+    ];
+
+    services.fw16-disable-wake-triggers = {
+        enable = true;
+    };
+}
 ```
 There are no additional options. The service runs once at boot and 
 disables everything but the power button for suspend resume until a reboot.
