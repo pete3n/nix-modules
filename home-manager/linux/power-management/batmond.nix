@@ -47,13 +47,16 @@ let
 				bat_last_cap="101" # 101 means unmeasured
 
 				log() {
-					${lib.optionalString cfg.logEvents ''
+					${lib.optionalString cfg.logEvents #sh 
+					''
 						_event="$1"; _cap="$2"; _th="$3"; _cmd="$4"
 						${pkgs.util-linux}/bin/logger -t batmond -- "event=$_event cap=''${_cap}% threshold=''${_th}% cmd=$_cmd"
 					''}
 
 					# Logging disabled
-					${lib.optionalString (!cfg.logEvents) '' : ''}
+					${lib.optionalString (!cfg.logEvents) #sh 
+						'' : ''
+					}
 				}
 
 				notify_tty() {
