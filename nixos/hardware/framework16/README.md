@@ -54,10 +54,15 @@ services.fw16-kbd-alsd = {
 the backlight is consistently hopping between brightness, try increasing this value.
 
 *noLight* -- Backlight brightness for very dark ambient lighting.
+
 *lowLight* -- Backlight brightness for dark ambient lighting.
+
 *dimLight* -- Backlight brightness for dim ambient lighting.
+
 *brightLight* -- Backlight brightness for bright ambient lighting.
+
 *sunLight* -- Backlight brightness for very bright (sunlight) ambient lighting.
 
 *batteryOnly* -- Only apply ambient light settings when the laptop is on battery.
+
 *acDefault* -- Default brightness to apply when not running on battery.
