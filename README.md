@@ -35,7 +35,7 @@ A one-shot systemd service to disable all wakeup sources except the power button
     to just start hyprlock. I had already built lidmond, so this was a natural progression.
 
 - [hyprSuspendBlocker](https://github.com/pete3n/nix-modules/tree/nixos-25.11/home-manager/linux/power-management#hyprSuspendBlocker) -- *Hyprland suspend blocker*: A script to block ```systemctl suspend ```
-    given user specified conditions. Inteded for use with hypridle.
+    given user specified conditions. Intended for use with hypridle.
 
     - *Why?* Because I wanted to configure hypridle to suspend my laptop after 10 minutes
     if it was on battery power, but not if it was on external AC power.
