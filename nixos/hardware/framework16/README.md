@@ -9,7 +9,7 @@ laptop lid closes.
 
 ### fw16-kbd-alsd usage
 Follow the [repo instructions](https://github.com/pete3n/nix-modules) to add the module inputs to your flake.
-Once added, import it in system configuration and enable it with:
+Once added, import it in your system configuration and enable it with:
 ### configuration.nix:
 ```
 { inputs, ... }:
@@ -80,7 +80,7 @@ but I have only tested this on a Framework16 with a Ryzen AI 300 mainboard.
 
 ### fw16-disable-wake-triggers
 Follow the [repo instructions](https://github.com/pete3n/nix-modules) to add the module inputs to your flake.
-Once added, import it in system configuration and enable it with:
+Once added, import it in your system configuration and enable it with:
 ### configuration.nix:
 ```
 { inputs, ... }:
