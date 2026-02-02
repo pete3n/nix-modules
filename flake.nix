@@ -34,9 +34,10 @@
           default = importModule ./home-manager/linux/default.nix;
 
           power-management = {
-							batmond = importModule ./home-manager/linux/power-management/batmond.nix;
+						batmond = importModule ./home-manager/linux/power-management/batmond.nix;
             hyprlidmon = importModule ./home-manager/linux/power-management/hyprlidmon.nix;
             hyprSuspendBlocker = importModule ./home-manager/linux/power-management/hyprSuspendBlocker.nix;
+            powerproud = importModule ./home-manager/linux/power-management/powerproud.nix;
           };
         };
       };

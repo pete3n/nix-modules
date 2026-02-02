@@ -142,7 +142,7 @@ let
       '';
 in
 {
-  options.services."powerproud" = {
+  options.services.powerproud = {
     enable = mkEnableOption "Enable powerprofile user daemon.";
 
 		logEvents = mkOption {
