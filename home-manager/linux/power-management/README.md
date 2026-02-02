@@ -4,7 +4,7 @@ with NixOS. These are Nix Home-manager modules for Linux that attempt to solve
 some of the issues I have encountered with power management.
 
 ## hyprlidmon
-A systemd laptop lid monitor dameon that runs customizable commands when the lid
+A systemd laptop lid monitor daemon that runs customizable commands when the lid
 opens and closes. Requires the [lidmond](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/power-management) module.
 
 ### hyprlidmon usage
