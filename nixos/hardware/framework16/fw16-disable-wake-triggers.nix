@@ -4,8 +4,8 @@
 { lib, config, pkgs, ... }:
 
 let
-  cfg = config.services.disable-wake-triggers;
-  disableWakeTriggers = pkgs.writeShellScript "disable-wake-triggers" #sh
+  cfg = config.services.fw16-disable-wake-triggers;
+  disableWakeTriggers = pkgs.writeShellScript "fw16-disable-wake-triggers" #sh
 		''
 			set -eu
 
@@ -24,7 +24,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    systemd.services.disable-wake-triggers = {
+    systemd.services.fw16-disable-wake-triggers = {
       description = "Disable wakeup devices except power.";
       wantedBy = [ "multi-user.target" ];
 
