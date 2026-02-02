@@ -35,6 +35,7 @@
 
           power-management = {
             hyprlidmon = importModule ./home-manager/linux/power-management/hyprlidmon.nix;
+            hyprSuspendBlocker = importModule ./home-manager/linux/power-management/hyprSuspendBlocker.nix;
           };
         };
       };

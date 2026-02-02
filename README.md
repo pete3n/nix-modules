@@ -14,6 +14,7 @@ more customizable and flexible control.
     on battery power, regardless of if I was in a Wayland or Xorg session. 
     I couldn't find a good implementation with existing services, so I made my own.
 
+## NixOS Hardware Modules
 - [fw16-kbd-alsd](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/hardware/framework16#fw16-kbd-alsd) -- *Framework16 keyboard ambient light sensor daemon*: 
 A systemd service to automate control of the keyboard backlight based on ambient lighting,
 battery status, and lid status.
@@ -32,6 +33,12 @@ A one-shot systemd service to disable all wakeup sources except the power button
     I closed the lid while on AC power with an external display connected, like
     a docking station. But if I didn't have an external display connected, I wanted
     to just start hyprlock. I had already built lidmond, so this was a natural progression.
+
+- [hyprSuspendBlocker](https://github.com/pete3n/nix-modules/tree/nixos-25.11/home-manager/linux/power-management#hyprSuspendBlocker) -- *Hyprland suspend blocker*: A script to block ```systemctl suspend ```
+    given user specified conditions. Inteded for use with hypridle.
+
+    - *Why?* Because I wanted to configure hypridle to suspend my laptop after 10 minutes
+    if it was on battery power, but not if it was on external AC power.
 
 ## Usage
 You can utilize these modules by adding is repo as an input to your flake.nix,
