@@ -125,17 +125,17 @@ let
 
 				# Return 0 if the given list is met (element and element ...)
 				blocker_cond_met() {
-					_group_json="$1"
+					_list_json="$1"
 
 					# Treat empty lists as false 
-					_len="$(printf '%s' "$_group_json" | ${pkgs.jq}/bin/jq 'length' 2>/dev/null || printf 0)"
+					_len="$(printf '%s' "$_list_json" | ${pkgs.jq}/bin/jq 'length' 2>/dev/null || printf 0)"
 					[ "$_len" -gt 0 ] || return 1
 
 					while IFS= read -r _cond; do
 						if ! block_suspend "$_cond"; then
 							return 1
 						fi
-					done < <(printf '%s' "$_group_json" | ${pkgs.jq}/bin/jq -r '.[]')
+					done < <(printf '%s' "$_list_json" | ${pkgs.jq}/bin/jq -r '.[]')
 
 					return 0
 				}
@@ -146,8 +146,8 @@ let
 					_outer_len="$(printf '%s' "$BLOCKERS_JSON" | ${pkgs.jq}/bin/jq 'length' 2>/dev/null || printf 0)"
 					[ "$_outer_len" -gt 0 ] || return 1
 
-					while IFS= read -r _group; do
-						if blocker_cond_met "$_group"; then
+					while IFS= read -r _list; do
+						if blocker_cond_met "$_list"; then
 							return 0
 						fi
 					done < <(printf '%s' "$BLOCKERS_JSON" | ${pkgs.jq}/bin/jq -c '.[]')
@@ -183,12 +183,12 @@ let
 				fi
 
 				if blocker_list_met; then
-					printf "A blocker group matched -> not suspending\n"
+					printf "A blocker list matched -> not suspending\n"
 					print_state
 					exit 0
 				fi
 
-				printf "No blocker groups matched -> suspending\n"
+				printf "No blocker lists matched -> suspending\n"
 				print_state
 				[ "$dry_run" -eq 1 ] && exit 0
 				exec ${pkgs.systemd}/bin/systemctl suspend
@@ -240,14 +240,16 @@ in
 				[ "extDisplay" "lidClosed" ]
 			];
 			description = ''
-				List of blocker lists. Each inner list is AND'ed; the outer list is OR'ed.
-				Suspend is blocked if any group evaluates to true.
+				List of blocker lists. All conditions in a list must match for it to be true.
+				Suspend is blocked if any list evaluates to true.
 
 				Example:
 					blockers = [
 						[ "extPower" ]
 						[ "extDisplay" "lidClosed" ]
 					];
+
+				Default: [ [ "extPower"] ]
 			'';
 		};
   };
