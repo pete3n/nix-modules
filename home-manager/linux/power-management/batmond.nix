@@ -48,13 +48,12 @@ let
 
 				log() {
 					${lib.optionalString cfg.logEvents ''
-						# usage: log EVENT CAP CMD
-						_event="$1"; _cap="$2"; _cmd="$3"
-						${pkgs.util-linux}/bin/logger -t batmond -- "event=$_event cap=''${_cap}% cmd=$_cmd"
+						_event="$1"; _cap="$2"; _th="$3"; _cmd="$4"
+						${pkgs.util-linux}/bin/logger -t batmond -- "event=$_event cap=''${_cap}% threshold=''${_th}% cmd=$_cmd"
 					''}
-					${lib.optionalString (!cfg.logEvents) ''
-						: # logging disabled
-					''}
+
+					# Logging disabled
+					${lib.optionalString (!cfg.logEvents) '' : ''}
 				}
 
 				have_gui() {
@@ -66,9 +65,6 @@ let
 				notify_tty() {
 					_title="$1"
 					_body="$2"
-					# stderr (visible in journal for user units)
-					printf 'batmond: %s - %s\n' "$_title" "$_body" >&2
-					# optional pipe to logger command
 					printf '%s - %s\n' "$_title" "$_body" \
 					| ${pkgs.runtimeShell} -c "$TTY_NOTIFY_CMD" >/dev/null 2>&1 || true
 				}
@@ -83,12 +79,12 @@ let
 					_title="$1"
 					_gui_msg="$2"
 					_tty_msg="$3"
-
-					if have_gui; then
-						if notify_gui "$_title" "$_gui_msg"; then
-							return 0
-						fi
-					fi
+		notify_gui "$_title" "$_gui_msg"
+				#if have_gui; then
+				#		if notify_gui "$_title" "$_gui_msg"; then
+				#			return 0
+				#		fi
+				#	fi
 					notify_tty "$_title" "$_tty_msg"
 				}
 
@@ -127,7 +123,7 @@ let
 				&& [ "''${bat_last_cap}" -gt "''${SHUTDOWN_PERCENT}" ]; then
 					update_bat_last_cap
 					notify "Battery ''${bat_cap}%" "$SHUTDOWN_GUI_MSG" "$SHUTDOWN_TTY_MSG"
-					log "shutdown" "$bat_cap" "systemctl $SHUTDOWN_SUB_CMD"
+					log "shutdown" "$bat_cap" "$SHUTDOWN_PERCENT" "systemctl $SHUTDOWN_SUB_CMD"
 					${pkgs.systemd}/bin/systemctl "$SHUTDOWN_SUB_CMD"
 					exit 0
 				fi
@@ -136,7 +132,7 @@ let
 				&& [ "''${bat_last_cap}" -gt "''${HIBERNATE_PERCENT}" ]; then
 					update_bat_last_cap
 					notify "Battery ''${bat_cap}%" "$HIBERNATE_GUI_MSG" "$HIBERNATE_TTY_MSG"
-					log "hibernate" "$bat_cap" "systemctl $HIBERNATE_SUB_CMD"
+					log "hibernate" "$bat_cap" "$HIBERNATE_PERCENT" "systemctl $HIBERNATE_SUB_CMD"
 					${pkgs.systemd}/bin/systemctl "$HIBERNATE_SUB_CMD"
 					exit 0
 				fi
@@ -145,7 +141,7 @@ let
 				&& [ "''${bat_last_cap}" -gt "''${SUSPEND_PERCENT}" ]; then
 					update_bat_last_cap
 					notify "Battery ''${bat_cap}%" "$SUSPEND_GUI_MSG" "$SUSPEND_TTY_MSG"
-					log "suspend" "$bat_cap" "systemctl $SUSPEND_SUB_CMD"
+					log "suspend" "$bat_cap" "$SUSPEND_PERCENT" "systemctl $SUSPEND_SUB_CMD"
 					${pkgs.systemd}/bin/systemctl "$SUSPEND_SUB_CMD"
 					exit 0
 				fi
@@ -154,7 +150,7 @@ let
 				&& [ "''${bat_cap}" -lt "''${bat_last_cap}" ]; then
 					update_bat_last_cap
 					notify "Battery ''${bat_cap}%" "$WARN_BELOW_GUI_MSG" "$WARN_BELOW_TTY_MSG"
-					log "warn" "$bat_cap" "none"
+					log "warn" "$bat_cap" "$WARN_BELOW_PERCENT" "none"
 					exit 0
 				fi
       '';
