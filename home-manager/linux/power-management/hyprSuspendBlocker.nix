@@ -123,6 +123,38 @@ let
 					esac
 				}
 
+				# Return 0 if the given list is met (element and element ...)
+				blocker_cond_met() {
+					_group_json="$1"
+
+					# Treat empty lists as false 
+					_len="$(printf '%s' "$_group_json" | ${pkgs.jq}/bin/jq 'length' 2>/dev/null || printf 0)"
+					[ "$_len" -gt 0 ] || return 1
+
+					while IFS= read -r _cond; do
+						if ! block_suspend "$_cond"; then
+							return 1
+						fi
+					done < <(printf '%s' "$_group_json" | ${pkgs.jq}/bin/jq -r '.[]')
+
+					return 0
+				}
+
+				# True if ANY list is true
+				blocker_list_met() {
+					# Empty outer list = no blockers (allow suspend)
+					_outer_len="$(printf '%s' "$BLOCKERS_JSON" | ${pkgs.jq}/bin/jq 'length' 2>/dev/null || printf 0)"
+					[ "$_outer_len" -gt 0 ] || return 1
+
+					while IFS= read -r _group; do
+						if blocker_cond_met "$_group"; then
+							return 0
+						fi
+					done < <(printf '%s' "$BLOCKERS_JSON" | ${pkgs.jq}/bin/jq -c '.[]')
+
+					return 1
+				}
+
 				print_state() {
 					printf 'power=%s\n' "$state_power"
 					printf 'lid=%s\n' "$state_lid"
@@ -150,36 +182,6 @@ let
 					exit 0
 				fi
 
-				# Return 0 if the given group (JSON array of strings) is met (AND).
-				blocker_cond_met() {
-					_group_json="$1"
-
-					# Empty group: treat as false (don’t accidentally block everything)
-					_len="$(printf '%s' "$_group_json" | ${pkgs.jq}/bin/jq 'length' 2>/dev/null || printf 0)"
-					[ "$_len" -gt 0 ] || return 1
-
-					printf '%s' "$_group_json" | ${pkgs.jq}/bin/jq -r '.[]' | while IFS= read -r _cond; do
-						if ! block_suspend "$_cond"; then
-							exit 1
-						fi
-					done
-				}
-
-				# True if ANY group is satisfied (OR).
-				blocker_list_met() {
-					# Empty outer list => no blockers (allow suspend)
-					_outer_len="$(printf '%s' "$BLOCKERS_JSON" | ${pkgs.jq}/bin/jq 'length' 2>/dev/null || printf 0)"
-					[ "$_outer_len" -gt 0 ] || return 1
-
-					printf '%s' "$BLOCKERS_JSON" | ${pkgs.jq}/bin/jq -c '.[]' | while IFS= read -r _group; do
-						if blocker_cond_met "$_group"; then
-							exit 0
-						fi
-					done
-
-					exit 1
-				}
-
 				if blocker_list_met; then
 					printf "A blocker group matched -> not suspending\n"
 					print_state
@@ -201,12 +203,12 @@ in
 		home.packages = [ hyprSuspendBlocker ];
 		assertions = [
 			{
-				assertion = !(lib.elem "lidOpen" cfg.blockers && lib.elem "lidClosed" cfg.blockers);
-				message = "hyprSuspendBlocker: cannot set both lidOpen and lidClosed blockers.";
+				assertion = lib.all (list: !(lib.elem "lidOpen" list && lib.elem "lidClosed" list)) cfg.blockers;
+				message = "hyprSuspendBlocker: a blocker list cannot contain both lidOpen and lidClosed.";
 			}
 			{
-				assertion = !(lib.elem "extPower" cfg.blockers && lib.elem "onBattery" cfg.blockers);
-				message = "hyprSuspendBlocker: cannot set both extPower and onBattery blockers.";
+				assertion = lib.all (list: !(lib.elem "extPower" list && lib.elem "onBattery" list)) cfg.blockers;
+				message = "hyprSuspendBlocker: a blocker list cannot contain both extPower and onBattery.";
 			}
 		];
 	};
