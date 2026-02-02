@@ -3,7 +3,7 @@ Power management is one of the bigger struggles I have had using a laptop with
 with NixOS. These are Nix Home-manager modules for Linux that attempt to solve
 some of the issues I have encountered with power management.
 
-## hyprlidmon
+# hyprlidmon
 A systemd laptop lid monitor daemon that runs customizable commands when the lid
 opens and closes. Requires the [lidmond](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/power-management) NixOS module.
 
@@ -107,7 +107,7 @@ display is present or the laptop is on battery, then it will open hyprlock and
 also execute any commands from lidmond.
 
 
-## hyprSuspendBlocker
+# hyprSuspendBlocker
 A wrapper script for ``` systemctl suspend ``` that blocks suspend if user specified 
 conditions are met. It is intended for use with programs like hypridle.
 
@@ -184,7 +184,7 @@ programs.hyprSuspendBlocker = {
 ```
 
 
-## batmond
+# batmond
 A systemd user daemon that displays customizable messages and runs customizable 
 commands when different levels of battery discharge are detected.
 It supports running in both graphical and non-graphical (tty) environments.
@@ -228,21 +228,39 @@ services.batmond = {
 };
 ```
 *batteryInterval* -- How frequently (in seconds) to check the battery discharge level.
+
 *logEvents* -- Whether to log daemon events. These can be read with ```journalctl --user -t batmond```
+
 *guiNotifyCmd* -- The command to run to display notifications in a graphical environment.
+
 *ttyNotifyCmd* -- The command to run to display notifications in a tty envvironment.
+
 *warnBelowPercent* -- The remaining battery capacity below which warnings will begin to be send.
+
 *warnBelowGuiMsg* -- The battery warning message to display in GUI environments.
+
 *warnBelowTtyMsg* -- The battery warning message to display in TTY environments.
+
 *suspendPercent*  -- The remaining battery capacity at which the suspend command will be run (0 disables).
+
 *suspendSubCmd* -- The ```systemctl``` subcommand to run to suspend the system.
+
 *suspendTtyMsg* -- The suspend notification message to display in TTY environments. 
+
 *suspendGuiMsg* -- The suspend notification message to display in GUI environments.
+
 *hibernatePercent* -- The remaining battery capacity at which the hibernate command will be run (0 disables).
+
 *hibernateSubCmd* -- The ```systemctl``` subcommand to run to hibernate the system.
+
 *hibernateTtyMsg* -- The suspend notification message to display in TTY environments. 
+
 *hibernateGuiMsg* -- The suspend notification message to display in GUI environments.
+
 *shutdownPercent* -- The remaining battery capacity at which the shutdown command will be run (0 disables).
+
 *shutdownSubCmd* -- The ```systemctl``` subcommand to run to shutdown the system.
+
 *shutdownGuiMsg* -- The shutdown notification message to display in GUI environments. 
+
 *shutdownTtyMsg* -- The shutdown notification message to display in TTY environments. 
