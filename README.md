@@ -22,7 +22,7 @@ battery status, and lid status.
 
 - [fw16-disable-wake-triggers](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/hardware/framework16#fw16-disable-wake-triggers) -- *Framework16 disable wake triggers service*: 
 A one-shot systemd service to disable all wakeup sources except the power button.
-    - *Why?* My laptop was constantly waking up prematurely from suspend from from sources
+    - *Why?* My laptop was constantly waking up prematurely from suspend from sources
     that I couldn't isolate, so I disabled all of them.
 
 ## Home-manager Modules
