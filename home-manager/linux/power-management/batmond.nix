@@ -24,19 +24,19 @@ let
 				GUI_NOTIFY_CMD="${toString cfg.guiNotifyCmd}"
 				TTY_NOTIFY_CMD="${toString cfg.ttyNotifyCmd}"
 				WARN_BELOW_PERCENT="${toString cfg.warnBelowPercent}"
-				WARN_BELOW_GUI_MSG="${escapeShellArg cfg.warnBelowGuiMsg}"
-				WARN_BELOW_TTY_MSG="${escapeShellArg cfg.warnBelowTtyMsg}"
+				WARN_BELOW_GUI_MSG="${cfg.warnBelowGuiMsg}"
+				WARN_BELOW_TTY_MSG="${cfg.warnBelowTtyMsg}"
 				SUSPEND_PERCENT="${toString cfg.suspendPercent}"
-				SUSPEND_GUI_MSG="${escapeShellArg cfg.suspendGuiMsg}"
-				SUSPEND_TTY_MSG="${escapeShellArg cfg.suspendTtyMsg}"
+				SUSPEND_GUI_MSG="${cfg.suspendGuiMsg}"
+				SUSPEND_TTY_MSG="${cfg.suspendTtyMsg}"
 				SUSPEND_SUB_CMD="${toString cfg.suspendSubCmd}"
 				HIBERNATE_PERCENT="${toString cfg.hibernatePercent}"
-				HIBERNATE_GUI_MSG="${escapeShellArg cfg.hibernateGuiMsg}"
-				HIBERNATE_TTY_MSG="${escapeShellArg cfg.hibernateTtyMsg}"
+				HIBERNATE_GUI_MSG="${cfg.hibernateGuiMsg}"
+				HIBERNATE_TTY_MSG="${cfg.hibernateTtyMsg}"
 				HIBERNATE_SUB_CMD="${toString cfg.hibernateSubCmd}"
 				SHUTDOWN_PERCENT="${toString cfg.shutdownPercent}"
-				SHUTDOWN_GUI_MSG="${escapeShellArg cfg.shutdownGuiMsg}"
-				SHUTDOWN_TTY_MSG="${escapeShellArg cfg.shutdownTtyMsg}"
+				SHUTDOWN_GUI_MSG="${cfg.shutdownGuiMsg}"
+				SHUTDOWN_TTY_MSG="${cfg.shutdownTtyMsg}"
 				SHUTDOWN_SUB_CMD="${toString cfg.shutdownSubCmd}"
 				STATE_DIR="''${XDG_STATE_HOME:-$HOME/.local/state}/batmond"
 				STATE_FILE="''${STATE_DIR}/bat_last_cap"
@@ -347,38 +347,32 @@ in
       batmond
     ];
 
-    systemd.user.services."batmond" = {
-      Unit = {
-        Description = "Battery level warning notifications and actions";
-        # Stop the service when we are heading toward sleep
-        Conflicts = [ "sleep.target" ];
-      };
+		systemd.user.services."batmond" = {
+			Unit = {
+				Description = "Battery level warning notifications and actions";
+			};
 
-      Service = {
-        Type = "oneshot";
-        ExecStart = "${batmond}/bin/batmond";
-      };
+			Service = {
+				Type = "oneshot";
+				ExecStart = "${batmond}/bin/batmond";
+			};
+		};
 
-      Install = {
-        WantedBy = [ "default.target" ];
-				After = [ "graphical-session.target" ];
-				PartOf = [ "graphical-session.target" ];
-      };
-    };
+		systemd.user.timers."batmond" = {
+			Unit = {
+				Description = "Periodic battery level check";
+			};
 
-    systemd.user.timers."batmond" = {
-      Unit = {
-        Description = "Periodic battery level check";
-      };
-      Timer = {
-        OnBootSec = "1min";
-        OnUnitActiveSec = "${toString cfg.batteryInterval}s";
-        AccuracySec = "10s";
-        Persistent = true;
-      };
-      Install = {
-        WantedBy = [ "timers.target" ];
-      };
-    };
+			Timer = {
+				OnBootSec = "1min";
+				OnUnitActiveSec = "${toString cfg.batteryInterval}s";
+				AccuracySec = "10s";
+				Persistent = true;
+			};
+
+			Install = {
+				WantedBy = [ "timers.target" ];
+			};
+		};
   };
 }
