@@ -182,3 +182,67 @@ programs.hyprSuspendBlocker = {
     ];
 };
 ```
+
+
+## batmond
+A systemd user daemon that displays customizable messages and runs customizable 
+commands when different levels of battery discharge are detected.
+It supports running in both graphical and non-graphical (tty) environments.
+
+### batmond usage
+Follow the [repo instructions](https://github.com/pete3n/nix-modules) to add the module inputs to your flake.
+Ensure that the home modules are imported in your Home-manager configuration 
+and enable batmond with:
+### home.nix:
+```
+services.batmond = {
+    enable = true;
+};
+```
+This is all that is necessary to use the default configuration.
+
+batmond provides a number of module options to adjust default behavior:
+### home.nix:
+```
+services.batmond = {
+    enable = true;
+    batteryInterval = 30;
+    logEvents =  true;
+    guiNotifyCmd = "${pkgs.libnotify}/bin/notify-send -u critical";
+    ttyNotifyCmd = "${pkgs.util-linux}/bin/wall -n";
+    warnBelowPercent = 15;
+    warnBelowGuiMsg = "🪫‼️ Warning battery is running low!";
+    warnBelowTtyMsg = "!! Warning battery is running low!";
+    suspendPercent = 10;
+    suspendSubCmd = "suspend";
+    suspendTtyMsg = "Battery low. Suspending system...";
+    suspendGuiMsg = "🪫‼️ Batter low. 🌙 Suspending system...";
+    hibernatePercent = 0;
+    hibernateSubCmd = "hibernate";
+    hibernateTtyMsg = "Battery severely low. Hibernating system...";
+    hibernateGuiMsg = "🪫‼️ Batter severely low.  Hibernating system...";
+    shutdownPercent = 1;
+    shutdownSubCmd = "poweroff";
+    shutdownGuiMsg = "🪫‼️ Battery critically low. ⏻ Shutting down...";
+    shutdownTtyMsg = "Battery critically low. Shutting down system...";
+};
+```
+*batteryInterval* -- How frequently (in seconds) to check the battery discharge level.
+*logEvents* -- Whether to log daemon events. These can be read with ```journalctl --user -t batmond```
+*guiNotifyCmd* -- The command to run to display notifications in a graphical environment.
+*ttyNotifyCmd* -- The command to run to display notifications in a tty envvironment.
+*warnBelowPercent* -- The remaining battery capacity below which warnings will begin to be send.
+*warnBelowGuiMsg* -- The battery warning message to display in GUI environments.
+*warnBelowTtyMsg* -- The battery warning message to display in TTY environments.
+*suspendPercent*  -- The remaining battery capacity at which the suspend command will be run (0 disables).
+*suspendSubCmd* -- The ```systemctl``` subcommand to run to suspend the system.
+*suspendTtyMsg* -- The suspend notification message to display in TTY environments. 
+*suspendGuiMsg* -- The suspend notification message to display in GUI environments.
+*hibernatePercent* -- The remaining battery capacity at which the hibernate command will be run (0 disables).
+*hibernateSubCmd* -- The ```systemctl``` subcommand to run to hibernate the system.
+*hibernateTtyMsg* -- The suspend notification message to display in TTY environments. 
+*hibernateGuiMsg* -- The suspend notification message to display in GUI environments.
+*shutdownPercent* -- The remaining battery capacity at which the shutdown command will be run (0 disables).
+*shutdownSubCmd* -- The ```systemctl``` subcommand to run to shutdown the system.
+*shutdownGuiMsg* -- The shutdown notification message to display in GUI environments. 
+*shutdownTtyMsg* -- The shutdown notification message to display in TTY environments. 

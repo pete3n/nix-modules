@@ -56,12 +56,6 @@ let
 					${lib.optionalString (!cfg.logEvents) '' : ''}
 				}
 
-				have_gui() {
-					[ -n "''${WAYLAND_DISPLAY:-}" ] || [ -n "''${DISPLAY:-}" ] || return 1
-					[ -n "''${DBUS_SESSION_BUS_ADDRESS:-}" ] || return 1
-					return 0
-				}
-
 				notify_tty() {
 					_title="$1"
 					_body="$2"
@@ -79,12 +73,7 @@ let
 					_title="$1"
 					_gui_msg="$2"
 					_tty_msg="$3"
-		notify_gui "$_title" "$_gui_msg"
-				#if have_gui; then
-				#		if notify_gui "$_title" "$_gui_msg"; then
-				#			return 0
-				#		fi
-				#	fi
+					notify_gui "$_title" "$_gui_msg"
 					notify_tty "$_title" "$_tty_msg"
 				}
 
@@ -187,6 +176,7 @@ in
 			description = ''
 				Command used for non-GUI notifications.
 				Message will be passed on stdin.
+				Set to ':' to disable.
 
 				Default: '${pkgs.util-linux}/bin/wall -n'
 			'';

@@ -27,6 +27,14 @@ A one-shot systemd service to disable all wakeup sources except the power button
     that I couldn't isolate, so I disabled all of them.
 
 ## Home-manager Modules
+- [batmond](https://github.com/pete3n/nix-modules/tree/nixos-25.11/home-manager/linux/power-management#batmond) -- *Battery monitor daemon*: A systemd user daemon that displays 
+    customizable messages and runs customizable commands when different levels of 
+    battery discharge are detected. It supports running in both graphical and 
+    non-graphical (tty) environments.
+
+    - *Why?* Because my laptop was just dying when the battery drained and I didn't
+    notice it. 
+
 - [hyprlidmon](https://github.com/pete3n/nix-modules/tree/nixos-25.11/home-manager/linux/power-management#hyprlidmon) -- *Hyprland lid monitor*: The Home-manager service companion for lidmond.
 
     - *Why?*  Because I wanted to disable the internal display on my laptop when 
