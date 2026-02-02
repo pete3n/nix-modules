@@ -11,7 +11,7 @@ let
   blockers = cfg.blockers;
 
   hyprSuspendBlocker =
-    pkgs.writeShellScriptBin "hypr-suspend-block" # sh
+    pkgs.writeShellScriptBin "hypr-suspend-blocker" # sh
       ''
 				set -eu
 
