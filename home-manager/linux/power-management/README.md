@@ -5,7 +5,7 @@ some of the issues I have encountered with power management.
 
 ## hyprlidmon
 A systemd laptop lid monitor daemon that runs customizable commands when the lid
-opens and closes. Requires the [lidmond](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/power-management) module.
+opens and closes. Requires the [lidmond](https://github.com/pete3n/nix-modules/tree/nixos-25.11/nixos/power-management) NixOS module.
 
 ### hyprlidmon usage
 Follow the [repo instructions](https://github.com/pete3n/nix-modules) to add the module inputs to your flake.
