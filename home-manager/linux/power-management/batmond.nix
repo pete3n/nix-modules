@@ -11,7 +11,6 @@ let
     mkEnableOption
     mkIf
     types
-    escapeShellArg
     ;
 
   cfg = config.services.batmond;
@@ -46,6 +45,17 @@ let
 				bat_status=""
 				bat_cap="100" # Assume full until measured
 				bat_last_cap="101" # 101 means unmeasured
+
+				log() {
+					${lib.optionalString cfg.logEvents ''
+						# usage: log EVENT CAP CMD
+						_event="$1"; _cap="$2"; _cmd="$3"
+						${pkgs.util-linux}/bin/logger -t batmond -- "event=$_event cap=''${_cap}% cmd=$_cmd"
+					''}
+					${lib.optionalString (!cfg.logEvents) ''
+						: # logging disabled
+					''}
+				}
 
 				have_gui() {
 					[ -n "''${WAYLAND_DISPLAY:-}" ] || [ -n "''${DISPLAY:-}" ] || return 1
@@ -115,24 +125,27 @@ let
 				# Check in reverse order from shutdown to hibernate to suspend to warn
 				if [ "''${SHUTDOWN_PERCENT}" -gt 0 ] && [ "''${bat_cap}" -le "''${SHUTDOWN_PERCENT}" ] \
 				&& [ "''${bat_last_cap}" -gt "''${SHUTDOWN_PERCENT}" ]; then
-					notify "Battery ''${bat_cap}%" "$SHUTDOWN_GUI_MSG" "$SHUTDOWN_TTY_MSG"
 					update_bat_last_cap
+					notify "Battery ''${bat_cap}%" "$SHUTDOWN_GUI_MSG" "$SHUTDOWN_TTY_MSG"
+					log "shutdown" "$bat_cap" "systemctl $SHUTDOWN_SUB_CMD"
 					${pkgs.systemd}/bin/systemctl "$SHUTDOWN_SUB_CMD"
 					exit 0
 				fi
 
 				if [ "''${HIBERNATE_PERCENT}" -gt 0 ] && [ "''${bat_cap}" -le "''${HIBERNATE_PERCENT}" ] \
 				&& [ "''${bat_last_cap}" -gt "''${HIBERNATE_PERCENT}" ]; then
-					notify "Battery ''${bat_cap}%" "$HIBERNATE_GUI_MSG" "$HIBERNATE_TTY_MSG"
 					update_bat_last_cap
+					notify "Battery ''${bat_cap}%" "$HIBERNATE_GUI_MSG" "$HIBERNATE_TTY_MSG"
+					log "hibernate" "$bat_cap" "systemctl $HIBERNATE_SUB_CMD"
 					${pkgs.systemd}/bin/systemctl "$HIBERNATE_SUB_CMD"
 					exit 0
 				fi
 
 				if [ "''${SUSPEND_PERCENT}" -gt 0 ] && [ "''${bat_cap}" -le "''${SUSPEND_PERCENT}" ] \
 				&& [ "''${bat_last_cap}" -gt "''${SUSPEND_PERCENT}" ]; then
-					notify "Battery ''${bat_cap}%" "$SUSPEND_GUI_MSG" "$SUSPEND_TTY_MSG"
 					update_bat_last_cap
+					notify "Battery ''${bat_cap}%" "$SUSPEND_GUI_MSG" "$SUSPEND_TTY_MSG"
+					log "suspend" "$bat_cap" "systemctl $SUSPEND_SUB_CMD"
 					${pkgs.systemd}/bin/systemctl "$SUSPEND_SUB_CMD"
 					exit 0
 				fi
@@ -141,6 +154,7 @@ let
 				&& [ "''${bat_cap}" -lt "''${bat_last_cap}" ]; then
 					update_bat_last_cap
 					notify "Battery ''${bat_cap}%" "$WARN_BELOW_GUI_MSG" "$WARN_BELOW_TTY_MSG"
+					log "warn" "$bat_cap" "none"
 					exit 0
 				fi
       '';
@@ -148,6 +162,16 @@ in
 {
   options.services.batmond = {
     enable = mkEnableOption "Battery monitering service with warning + suspend/hibernate/shutdown actions";
+
+		logEvents = mkOption {
+			type = types.bool;
+			default = true;
+			description = ''
+				Whether to log events with logger -t batmond
+
+				Default: true
+			'';
+		};
 
 		guiNotifyCmd = mkOption {
 			type = types.str;
@@ -163,12 +187,12 @@ in
 
 		ttyNotifyCmd = mkOption {
 			type = types.str;
-			default = "${pkgs.systemd}/bin/systemd-cat -t batmond";
+			default = "${pkgs.util-linux}/bin/wall -n";
 			description = ''
 				Command used for non-GUI notifications.
 				Message will be passed on stdin.
 
-				Default: '${pkgs.systemd}/bin/systemd-cat -t batmond'
+				Default: '${pkgs.util-linux}/bin/wall -n'
 			'';
 		};
 
