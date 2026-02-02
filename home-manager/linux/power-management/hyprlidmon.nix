@@ -32,8 +32,8 @@ let
       ''
 				set -eu
 
-				EVENT_DIR=${lib.escapeShellArg cfg.eventDir}
-				POLL=${lib.escapeShellArg (toString cfg.pollIntervalSeconds)}
+				EVENT_DIR=${cfg.eventDir}
+				POLL=${toString cfg.pollIntervalSeconds}
 
 				STATE_DIR="''${XDG_STATE_HOME:-$HOME/.local/state}/hyprlidmon"
 				LAST_FILE="$STATE_DIR/last_seen"
@@ -42,9 +42,9 @@ let
 				mkdir -p "$STATE_DIR"
 				[ -e "$OPEN_CMDS_FILE" ] || : > "$OPEN_CMDS_FILE"
 
-				INT_CFG=${lib.escapeShellArg cfg.intDisplay}
+				INT_CFG=${cfg.intDisplay}
 				INT_DISP_FILE="$STATE_DIR/int_display"
-				INT_DISP=${lib.escapeShellArg cfg.intDisplay}
+				INT_DISP=${cfg.intDisplay}
 
 				ts=""
 				event=""

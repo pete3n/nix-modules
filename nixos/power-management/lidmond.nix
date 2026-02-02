@@ -18,9 +18,9 @@ let
 				umask 027
 				STATE_DIR="/run/lidmond"
 				EVENT_DIR="$STATE_DIR/events"
-				ACCESS_GROUP=${lib.escapeShellArg cfg.accessGroup}
+				ACCESS_GROUP=${cfg.accessGroup}
         DEFAULT_RESTORE_BRIGHTNESS="50"
-        BL_DEV=${lib.escapeShellArg backlightDevice}
+        BL_DEV=${backlightDevice}
 				OPEN_CMDS_FILE="$STATE_DIR/open_cmds"
 				CLOSE_BRIGHTNESS_FILE="$STATE_DIR/close_brightness"
 
