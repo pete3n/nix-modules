@@ -8,7 +8,6 @@
 
 let
   cfg = config.programs.hyprSuspendBlocker;
-  blockers = cfg.blockers;
 
   hyprSuspendBlocker =
     pkgs.writeShellScriptBin "hypr-suspend-blocker" # sh
@@ -16,8 +15,8 @@ let
 				set -eu
 
 				# Space-separated list of blockers
-				BLOCKERS="${lib.concatStringsSep " " blockers}"
-				INT_CFG=${cfg.intDisplay}
+				BLOCKERS_JSON=${lib.escapeShellArg (builtins.toJSON cfg.blockers)}
+				INT_CFG="${cfg.intDisplay}"
 
 				state_power=""
 				state_lid=""
@@ -128,7 +127,7 @@ let
 					printf 'power=%s\n' "$state_power"
 					printf 'lid=%s\n' "$state_lid"
 					printf 'extDisplay=%s\n' "$state_ext_disp"
-					printf 'blockers=%s\n' "$BLOCKERS"
+					printf 'blockers=%s\n' "$BLOCKERS_JSON"
 				}
 
 				while [ $# -gt 0 ]; do
@@ -151,22 +150,46 @@ let
 					exit 0
 				fi
 
-				# If no blockers configured, always suspend 
-				if [ -z "$BLOCKERS" ]; then
-					printf "No blockers configured -> suspending\n"
-					[ "$dry_run" -eq 1 ] && exit 0
-					exec ${pkgs.systemd}/bin/systemctl suspend
+				# Return 0 if the given group (JSON array of strings) is met (AND).
+				blocker_cond_met() {
+					_group_json="$1"
+
+					# Empty group: treat as false (don’t accidentally block everything)
+					_len="$(printf '%s' "$_group_json" | ${pkgs.jq}/bin/jq 'length' 2>/dev/null || printf 0)"
+					[ "$_len" -gt 0 ] || return 1
+
+					printf '%s' "$_group_json" | ${pkgs.jq}/bin/jq -r '.[]' | while IFS= read -r _cond; do
+						if ! block_suspend "$_cond"; then
+							exit 1
+						fi
+					done
+				}
+
+				# True if ANY group is satisfied (OR).
+				blocker_list_met() {
+					# Empty outer list => no blockers (allow suspend)
+					_outer_len="$(printf '%s' "$BLOCKERS_JSON" | ${pkgs.jq}/bin/jq 'length' 2>/dev/null || printf 0)"
+					[ "$_outer_len" -gt 0 ] || return 1
+
+					printf '%s' "$BLOCKERS_JSON" | ${pkgs.jq}/bin/jq -c '.[]' | while IFS= read -r _group; do
+						if blocker_cond_met "$_group"; then
+							exit 0
+						fi
+					done
+
+					exit 1
+				}
+
+				if blocker_list_met; then
+					printf "A blocker group matched -> not suspending\n"
+					print_state
+					exit 0
 				fi
 
-				# All blockers must be true to *avoid* suspend
-				for _cond in $BLOCKERS; do
-					if ! block_suspend "$_cond"; then
-						printf 'Condition failed: %s -> suspending\n' "$_cond"
-						print_state
-						[ "$dry_run" -eq 1 ] && exit 0
-						exec systemctl suspend
-					fi
-				done
+				printf "No blocker groups matched -> suspending\n"
+				print_state
+				[ "$dry_run" -eq 1 ] && exit 0
+				exec ${pkgs.systemd}/bin/systemctl suspend
 
 				echo "All conditions satisfied -> not suspending"
 				print_state
@@ -201,27 +224,29 @@ in
 			'';
     };
 
-    blockers = lib.mkOption {
-      type = lib.types.listOf (
-        lib.types.enum [
-          "lidOpen"
-          "lidClosed"
-          "extDisplay"
-          "extPower"
-          "onBattery"
-        ]
-      );
-      default = [ "extPower" ];
-      description = ''
-				List of conditions that must all be true to prevent suspend.
-				If any condition is false, hyprSuspendBlocker will run `systemctl suspend`.
-				Default: extPower
-      '';
-      example = [
-        "extPower"
-        "extDisplay"
-        "lidClosed"
-      ];
-    };
+		blockers = lib.mkOption {
+			type = lib.types.listOf (lib.types.listOf (lib.types.enum [
+				"lidOpen"
+				"lidClosed"
+				"extDisplay"
+				"extPower"
+				"onBattery"
+			]));
+			default = [ [ "extPower" ] ];
+			example = [
+				[ "extPower" ]
+				[ "extDisplay" "lidClosed" ]
+			];
+			description = ''
+				List of blocker lists. Each inner list is AND'ed; the outer list is OR'ed.
+				Suspend is blocked if any group evaluates to true.
+
+				Example:
+					blockers = [
+						[ "extPower" ]
+						[ "extDisplay" "lidClosed" ]
+					];
+			'';
+		};
   };
 }
