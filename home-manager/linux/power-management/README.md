@@ -325,5 +325,5 @@ available profiles can be seen with: ```powerprofilesctl list```
 *onBatteryBrightness* -- The screen backlight brightness to set when the battery is 
 discharging. NOTE: This will only decrease brightness to the specified level.
 
-*onAcBrigthness* -- The screen backlight brightness to set when the battery is charging.
+*onAcBrightness* -- The screen backlight brightness to set when the battery is charging.
 NOTE: This will only increase the screen brigthness to the desire level.
