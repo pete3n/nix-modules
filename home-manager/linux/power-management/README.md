@@ -314,7 +314,7 @@ services.powerproud = {
 ```
 *logEvents* -- Whether to log events for journalctl
 
-*batPoolInterval* -- How frequently (in seconds) to check the battery status
+*batPollInterval* -- How frequently (in seconds) to check the battery status
 
 *onBatteryProfile* -- The power profile to switch to when the battery is discharging
 
