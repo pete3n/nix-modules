@@ -264,3 +264,66 @@ services.batmond = {
 *shutdownGuiMsg* -- The shutdown notification message to display in GUI environments. 
 
 *shutdownTtyMsg* -- The shutdown notification message to display in TTY environments. 
+
+
+# powerproud
+A systemd user daemon that automatically switches power-profiles and adjusts screen 
+brightness based on the battery charging statues. Requires power-profiles-daemon.
+
+### powerproud usage
+Follow the [repo instructions](https://github.com/pete3n/nix-modules) to add the module inputs to your flake.
+Ensure that the home modules are imported in your Home-manager configuration 
+and enable batmond with:
+### home.nix:
+```
+services.powerproud = {
+    enable = true;
+};
+```
+This is all that is necessary to use the default configuration.
+
+If you are using NixOS, ensure that power-profiles-daemon is enabled in your system 
+configuration with:
+### configuration.nix:
+```
+services.power-profiles-daemon = {
+    enable = true;
+};
+```
+### Troubleshooting
+If powerproud is not functioning as expect, you can check logs with ```journalctl --user -t powerproud```
+If you see logs similar to this:
+```
+bat_state=charging cmd=powerprofiles set performance (failed)
+bat_state=unknown cmd=power-profiles-daemon inactive; will manage brightness only
+```
+The power-profiles-daemon is either not running or not being detected correctly.
+
+powerproud provides a number of module options to adjust default behavior:
+```
+### home.nix
+services.powerproud = {
+    enable = true;
+    logEvents = true;
+    batPollInterval = 5;
+    onBatteryProfile = "power-saver";
+    onAcProfile = "performance";
+    onBatteryBrightness = 50;
+    onAcBrightness = 100;
+}
+```
+*logEvents* -- Whether to log events for journalctl
+
+*batPoolInterval* -- How frequently (in seconds) to check the battery status
+
+*onBatteryProfile* -- The power profile to switch to when the battery is discharging
+
+available profiles can be seen with: ```powerprofilesctl list```
+
+*onAcProfile* -- The power profile to switch to when the battery is charging.
+
+*onBatteryBrightness* -- The screen backlight brightness to set when the battery is 
+discharging. NOTE: This will only decrease brightness to the specified level.
+
+*onAcBrigthness* -- The screen backlight brightness to set when the battery is charging.
+NOTE: This will only increase the screen brigthness to the desire level.

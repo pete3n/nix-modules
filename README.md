@@ -35,6 +35,13 @@ A one-shot systemd service to disable all wakeup sources except the power button
     - *Why?* Because my laptop was just dying when the battery drained and I didn't
     notice it. 
 
+- [powerproud](https://github.com/pete3n/nix-modules/tree/nixos-25.11/home-manager/linux/power-management#powerproud) -- *Powerprofiles user daemon*: A systemd user daemon that
+    automatically switches power-profiles and adjusts screen brightness based on the
+    battery charging statues. Requires power-profiles-daemon to function.
+
+    - *Why?* Because I wanted to automatically conserve battery life when unplugged
+    and maximimize performance and screen brightness when charging.
+
 - [hyprlidmon](https://github.com/pete3n/nix-modules/tree/nixos-25.11/home-manager/linux/power-management#hyprlidmon) -- *Hyprland lid monitor*: The Home-manager service companion for lidmond.
 
     - *Why?*  Because I wanted to disable the internal display on my laptop when 
