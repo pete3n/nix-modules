@@ -37,7 +37,7 @@ A one-shot systemd service to disable all wakeup sources except the power button
 
 - [powerproud](https://github.com/pete3n/nix-modules/tree/nixos-25.11/home-manager/linux/power-management#powerproud) -- *Powerprofiles user daemon*: A systemd user daemon that
     automatically switches power-profiles and adjusts screen brightness based on the
-    battery charging statues. Requires power-profiles-daemon to function.
+    battery charging status. Requires power-profiles-daemon to function.
 
     - *Why?* Because I wanted to automatically conserve battery life when unplugged
     and maximimize performance and screen brightness when charging.
