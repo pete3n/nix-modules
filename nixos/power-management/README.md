@@ -47,7 +47,7 @@ services.lidmond = {
 };
 ```
 *accessGroup* -- This is the group that will have permission to access lid events written
-to */run/lidmond/events* by the deamon. When using [hyprlidmon](https://github.com/pete3n/nix-modules/tree/nixos-25.11/home-manager/linux/power-management) you must ensure that
+to */run/lidmond/events* by the daemon. When using [hyprlidmon](https://github.com/pete3n/nix-modules/tree/nixos-25.11/home-manager/linux/power-management) you must ensure that
 your user is a member of this group. The default is the service group "lidmond".
 
 *lidClosedDefaultCmd* -- If no rule conditions match when the lid is closed, or there are
