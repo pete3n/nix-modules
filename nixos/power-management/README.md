@@ -80,7 +80,7 @@ services.lidmond = {
 	];
 };
 ```
-For the command to execute, all the rules in the *cond* list must match. However, only
+For the command to execute, all the rules in the *cond* list must match. However, 
 only extPower is currently implemented. If the rule matches then the commands in the closeCmd
 list will be executed, and the commands in the openCmd list will be saved to a state file and
 executed when the lid is re-opened.
