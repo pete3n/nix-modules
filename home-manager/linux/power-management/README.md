@@ -273,7 +273,7 @@ brightness based on the battery charging status. Requires power-profiles-daemon.
 ### powerproud usage
 Follow the [repo instructions](https://github.com/pete3n/nix-modules) to add the module inputs to your flake.
 Ensure that the home modules are imported in your Home-manager configuration 
-and enable batmond with:
+and enable powerproud with:
 ### home.nix:
 ```
 services.powerproud = {
