@@ -291,7 +291,7 @@ services.power-profiles-daemon = {
 };
 ```
 ### Troubleshooting
-If powerproud is not functioning as expect, you can check logs with ```journalctl --user -t powerproud```
+If powerproud is not functioning as expected, you can check logs with ```journalctl --user -t powerproud```
 If you see logs similar to this:
 ```
 bat_state=charging cmd=powerprofiles set performance (failed)
