@@ -268,7 +268,7 @@ services.batmond = {
 
 # powerproud
 A systemd user daemon that automatically switches power-profiles and adjusts screen 
-brightness based on the battery charging statues. Requires power-profiles-daemon.
+brightness based on the battery charging status. Requires power-profiles-daemon.
 
 ### powerproud usage
 Follow the [repo instructions](https://github.com/pete3n/nix-modules) to add the module inputs to your flake.
