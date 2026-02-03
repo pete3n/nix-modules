@@ -5,7 +5,7 @@ power management control. There are also [hardware](https://github.com/pete3n/ni
 issues as well.
 
 ## lidmond
-A systemd laptop lid monitor dameon that runs customizable commands when the lid
+A systemd laptop lid monitor daemon that runs customizable commands when the lid
 opens and closes.
 
 ### lidmond usage
