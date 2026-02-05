@@ -18,9 +18,9 @@ let
 				umask 027
 				STATE_DIR="/run/lidmond"
 				EVENT_DIR="$STATE_DIR/events"
-				ACCESS_GROUP=${cfg.accessGroup}
+				ACCESS_GROUP="${toString cfg.accessGroup}"
         DEFAULT_RESTORE_BRIGHTNESS="50"
-        BL_DEV=${backlightDevice}
+        BL_DEV="${backlightDevice}"
 				OPEN_CMDS_FILE="$STATE_DIR/open_cmds"
 				CLOSE_BRIGHTNESS_FILE="$STATE_DIR/close_brightness"
 
@@ -460,7 +460,7 @@ in
 		];
 
     systemd.services."lidmond" = {
-      description = "Hypr lid monitor (custom lid event handler)";
+      description = "laptop lid event daemon";
       wantedBy = [ "multi-user.target" ];
       after = [ "multi-user.target" ];
       path = [ lidmond ];

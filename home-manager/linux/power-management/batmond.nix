@@ -362,7 +362,7 @@ in
 
 		systemd.user.services."batmond" = {
 			Unit = {
-				Description = "Battery level warning notifications and actions";
+				Description = "Battery level warning notifications and actions daemon";
 			};
 
 			Service = {
