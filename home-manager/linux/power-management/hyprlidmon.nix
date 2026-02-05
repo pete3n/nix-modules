@@ -39,7 +39,7 @@ let
 				LAST_FILE="$STATE_DIR/last_seen"
 				OPEN_CMDS_FILE="$STATE_DIR/open_cmds"
 
-				mkdir -p "$STATE_DIR"
+				${pkgs.coreutils}/bin/mkdir -p "$STATE_DIR"
 				[ -e "$OPEN_CMDS_FILE" ] || : > "$OPEN_CMDS_FILE"
 
 				INT_CFG=${cfg.intDisplay}
