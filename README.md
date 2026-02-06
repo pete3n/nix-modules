@@ -2,7 +2,7 @@
 This is a collection of my more polished Nix modules for NixOS, Nix-Darwin, 
 and Nix Home-manager, taken from my [make-nix](https://github.com/pete3n/make-nix) config.
 
-Currently the NixOS modules moslty focus on Linux power management issues, and
+Currently the NixOS modules mostly focus on Linux power management issues, and
 hardware specific quirks for Framework computers. Most of the Home-manager modules are
 for use with Hyprland. I will add Nix-Darwin and cross-platform modules in the future.
 
