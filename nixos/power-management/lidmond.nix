@@ -13,50 +13,49 @@ let
   lidmond =
     pkgs.writeShellScriptBin "lidmond" # sh
       ''
-        set -eu
+        set -e
 
-				umask 027
-				STATE_DIR="/run/lidmond"
-				EVENT_DIR="$STATE_DIR/events"
-				ACCESS_GROUP="${toString cfg.accessGroup}"
+        umask 027
+        STATE_DIR="/run/lidmond"
+        EVENT_DIR="$STATE_DIR/events"
+        ACCESS_GROUP="${toString cfg.accessGroup}"
         DEFAULT_RESTORE_BRIGHTNESS="50"
         BL_DEV="${backlightDevice}"
-				OPEN_CMDS_FILE="$STATE_DIR/open_cmds"
-				CLOSE_BRIGHTNESS_FILE="$STATE_DIR/close_brightness"
+        OPEN_CMDS_FILE="$STATE_DIR/open_cmds"
+        CLOSE_BRIGHTNESS_FILE="$STATE_DIR/close_brightness"
 
         log() {
         	${lib.optionalString cfg.logToJournal ''
-           	printf "lidmond: %s\n" "$*"
-          ''
-					}
+           		printf "lidmond: %s\n" "$*"
+           	''}
         }
 
-				write_event() {
-					_event="$1"
+        write_event() {
+        	_event="$1"
 
-					if check_ext_power; then
-						_extPower=1
-					else
-						_extPower=0
-					fi
+        	if check_ext_power; then
+        		_extPower=1
+        	else
+        		_extPower=0
+        	fi
 
-					_ts="$(${pkgs.coreutils}/bin/date +%Y%m%dT%H%M%S%N)"
-					_file="$EVENT_DIR/''${_ts}-''${_event}.env"
-					_tmp="$EVENT_DIR/.''${_ts}-''${_event}.env.$$"
+        	_ts="$(${pkgs.coreutils}/bin/date +%Y%m%dT%H%M%S%N)"
+        	_file="$EVENT_DIR/''${_ts}-''${_event}.env"
+        	_tmp="$EVENT_DIR/.''${_ts}-''${_event}.env.$$"
 
-					umask 027
-					{
-						printf 'event=%s\n' "$_event"
-						printf 'extPower=%s\n' "''${_extPower:-0}"
-						printf 'ts=%s\n' "$_ts"
-					} >"$_tmp"
+        	umask 027
+        	{
+        		printf 'event=%s\n' "$_event"
+        		printf 'extPower=%s\n' "''${_extPower:-0}"
+        		printf 'ts=%s\n' "$_ts"
+        	} >"$_tmp"
 
-					${pkgs.coreutils}/bin/mv -f "$_tmp" "$_file"
-					${pkgs.coreutils}/bin/chown root:"$ACCESS_GROUP" "$_file"
-					${pkgs.coreutils}/bin/chmod 0640 "$_file"
+        	${pkgs.coreutils}/bin/mv -f "$_tmp" "$_file"
+        	${pkgs.coreutils}/bin/chown root:"$ACCESS_GROUP" "$_file"
+        	${pkgs.coreutils}/bin/chmod 0640 "$_file"
 
-					log "wrote event: $_file (extPower=$_extPower)"
-				}
+        	log "wrote event: $_file (extPower=$_extPower)"
+        }
 
         store_open_cmds() {
         	: > "$OPEN_CMDS_FILE"
@@ -255,6 +254,40 @@ let
         	run_cmd_list ${lib.escapeShellArg cfg.lidOpenedDefaultCmd}
         }
 
+        log "starting; eventDir=$EVENT_DIR poll=$POLL"
+
+        # On startup, check current lid state and emit a synthetic event if lid is closed
+        # This handles the case where the service restarts while
+        # the lid is already closed (e.g. clamshell mode during development)
+        _startup_lid=""
+        for _statef in /proc/acpi/button/lid/*/state; do
+        	[ -r "$_statef" ] || continue
+        	_startup_state="$(awk '{print $2}' "$_statef" 2>/dev/null || true)"
+        	case "$_startup_state" in
+        		open|closed) _startup_lid="$_startup_state"; break ;;
+        	esac
+        done
+
+        if [ "$_startup_lid" = "closed" ]; then
+        	log "startup: lid is closed, emitting synthetic lidClosed event"
+        	# Write a synthetic event file so the main loop picks it up naturally
+        	_startup_ts="$(date +%Y%m%dT%H%M%S%N)"
+        	_startup_file="$EVENT_DIR/''${_startup_ts}-lidClosed.env"
+        	_startup_extPower=0
+        	for _pf in /sys/class/power_supply/*/online; do
+        		[ -r "$_pf" ] || continue
+        		if [ "$(cat "$_pf" 2>/dev/null || echo 0)" = "1" ]; then
+        			_startup_extPower=1
+        			break
+        		fi
+        	done
+        	printf 'event=lidClosed\nextPower=%s\nts=%s\n' \
+        		"$_startup_extPower" "$_startup_ts" > "$_startup_file" || true
+        fi
+
+        log "found files: $(ls -1 "$EVENT_DIR"/*.env 2>/dev/null | wc -l)"
+        _last="$(last_seen)"
+
         log "starting (pollInterval=${toString cfg.pollIntervalSeconds}s)"
         _last="$(check_lid)"
 
@@ -275,12 +308,12 @@ let
         		log "lid state changed: $_last -> $_now"
         		case "$_now" in
         			closed) 
-								write_event lidClosed
-								handle_lidClosed 
-								;;
+        				write_event lidClosed
+        				handle_lidClosed 
+        				;;
         			open)   
-								write_event lidOpened
-								handle_lidOpened ;;
+        				write_event lidOpened
+        				handle_lidOpened ;;
         			*) log "failed to read lid state" ;;
         		esac
         		_last="$_now"
@@ -296,15 +329,15 @@ in
     accessGroup = lib.mkOption {
       type = lib.types.str;
       default = "lidmond";
-			example = "wheel";
-			description = ''
-				Group granted read access to lidmond state and events under /run/lidmond.
+      example = "wheel";
+      description = ''
+        				Group granted read access to lidmond state and events under /run/lidmond.
 
-				lidmond writes event files to:
-					/run/lidmond/events
+        				lidmond writes event files to:
+        					/run/lidmond/events
 
-				Users in this group can read those event files (e.g., for hyprlidmon).
-			'';
+        				Users in this group can read those event files (e.g., for hyprlidmon).
+        			'';
     };
 
     # triggers
@@ -313,18 +346,18 @@ in
       default = "systemctl suspend";
       example = "systemctl suspend";
       description = ''
-				Command to run on lidClosed if no other rule matches. 
-				Default: systemctl suspend
-			'';
+        				Command to run on lidClosed if no other rule matches. 
+        				Default: systemctl suspend
+        			'';
     };
 
     lidOpenedDefaultCmd = lib.mkOption {
       type = lib.types.str;
       default = ":";
       description = ''
-				Command to run on lidOpenened if no other rule matches. 
-				Default: systemctl suspend
-			'';
+        				Command to run on lidOpenened if no other rule matches. 
+        				Default: systemctl suspend
+        			'';
     };
 
     rules = lib.mkOption {
@@ -334,20 +367,20 @@ in
             cond = lib.mkOption {
               type = lib.types.listOf (lib.types.enum [ "extPower" ]);
               default = [ ];
-							example = [ "extPower" ];
-							description = "Condition list. Currently supports: extPower.";
+              example = [ "extPower" ];
+              description = "Condition list. Currently supports: extPower.";
             };
             closeCmd = lib.mkOption {
               type = lib.types.listOf lib.types.str;
               default = [ ];
-							example = [ "lidmond --backlight-off" ];
-							description = "Commands to run when lidClosed and this rule matches.";
+              example = [ "lidmond --backlight-off" ];
+              description = "Commands to run when lidClosed and this rule matches.";
             };
             openCmd = lib.mkOption {
               type = lib.types.listOf lib.types.str;
               default = [ ];
-							example = [ "lidmond --backlight-on" ];
-							description = "Commands to run when lidOpened (for this rule) after a matching close.";
+              example = [ "lidmond --backlight-on" ];
+              description = "Commands to run when lidOpened (for this rule) after a matching close.";
             };
           };
         }
@@ -361,67 +394,67 @@ in
         }
       ];
 
-			example = lib.literalExpression ''
-				[
-					{
-						# On AC power: turn backlight off when lid closes, restore on open
-						cond = [ "extPower" ];
-						closeCmd = [ "lidmond --backlight-off" ];
-						openCmd  = [ "lidmond --backlight-on" ];
-					}
-				]
-			'';
+      example = lib.literalExpression ''
+        				[
+        					{
+        						# On AC power: turn backlight off when lid closes, restore on open
+        						cond = [ "extPower" ];
+        						closeCmd = [ "lidmond --backlight-off" ];
+        						openCmd  = [ "lidmond --backlight-on" ];
+        					}
+        				]
+        			'';
 
-			description = ''
-				Rule list evaluated on lidClosed, in order. First match wins.
+      description = ''
+        				Rule list evaluated on lidClosed, in order. First match wins.
 
-				Conditions:
-					- "extPower": external power is online (any /sys/class/power_supply/*/online == 1)
+        				Conditions:
+        					- "extPower": external power is online (any /sys/class/power_supply/*/online == 1)
 
-				lidmond always writes event files to /run/lidmond/events; rules control
-				additional actions (like backlight control).
+        				lidmond always writes event files to /run/lidmond/events; rules control
+        				additional actions (like backlight control).
 
-				Example:
-					[
-						{
-							# On AC power: turn backlight off when lid closes, restore on open
-							cond = [ "extPower" ];
-							closeCmd = [ "lidmond --backlight-off" ];
-							openCmd  = [ "lidmond --backlight-on" ];
-						}
-					]
-			'';
+        				Example:
+        					[
+        						{
+        							# On AC power: turn backlight off when lid closes, restore on open
+        							cond = [ "extPower" ];
+        							closeCmd = [ "lidmond --backlight-off" ];
+        							openCmd  = [ "lidmond --backlight-on" ];
+        						}
+        					]
+        			'';
     };
 
     pollIntervalSeconds = lib.mkOption {
       type = lib.types.number;
       default = 1;
-			example = 1;
+      example = 1;
       description = ''
-				Polling interval (in seconds) to check lid state. 
-				Default: 1
-			'';
+        				Polling interval (in seconds) to check lid state. 
+        				Default: 1
+        			'';
     };
 
     logToJournal = lib.mkOption {
       type = lib.types.bool;
       default = true;
-			example = true;
+      example = true;
       description = ''
-				Whether to emit log lines to journald. 
-				Default: true
-			'';
+        				Whether to emit log lines to journald. 
+        				Default: true
+        			'';
     };
 
     backlightDevice = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-			example = "nvidia_wmi_ec_backlight";
+      example = "nvidia_wmi_ec_backlight";
       description = ''
-				brightnessctl device name to control (e.g., amdgpu_bl0). 
-				If null, auto-detect. 
-				Default: null
-			'';
+        				brightnessctl device name to control (e.g., amdgpu_bl0). 
+        				If null, auto-detect. 
+        				Default: null
+        			'';
     };
   };
 
@@ -450,14 +483,14 @@ in
       }
     ];
 
-		users.groups = lib.mkIf (cfg.accessGroup == "lidmond") {
-			lidmond = {};
-		};
+    users.groups = lib.mkIf (cfg.accessGroup == "lidmond") {
+      lidmond = { };
+    };
 
-		systemd.tmpfiles.rules = [
-			"d /run/lidmond 0750 root ${cfg.accessGroup} -"
-			"d /run/lidmond/events 2750 root ${cfg.accessGroup} -"
-		];
+    systemd.tmpfiles.rules = [
+      "d /run/lidmond 0750 root ${cfg.accessGroup} -"
+      "d /run/lidmond/events 2750 root ${cfg.accessGroup} -"
+    ];
 
     systemd.services."lidmond" = {
       description = "laptop lid event daemon";
@@ -469,11 +502,11 @@ in
         ExecStart = "${lidmond}/bin/lidmond";
         Restart = "always";
         RestartSec = 1;
-				UMask = "0027"; # Mask for group rx, owner rwx
-				RuntimeDirectory = "lidmond lidmond/events"; 
-				RuntimeDirectoryMode = "2750"; # Inherit group from parent directory
-				Group = cfg.accessGroup;
-				NoNewPrivileges = true;
+        UMask = "0027"; # Mask for group rx, owner rwx
+        RuntimeDirectory = "lidmond lidmond/events";
+        RuntimeDirectoryMode = "2750"; # Inherit group from parent directory
+        Group = cfg.accessGroup;
+        NoNewPrivileges = true;
         PrivateTmp = true;
         ProtectHome = true;
         ProtectSystem = "strict";
