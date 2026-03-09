@@ -254,7 +254,7 @@ let
         	run_cmd_list ${lib.escapeShellArg cfg.lidOpenedDefaultCmd}
         }
 
-        log "starting; eventDir=$EVENT_DIR poll=$POLL"
+				log "starting; eventDir=$EVENT_DIR pollInterval=${toString cfg.pollIntervalSeconds}s"
 
         # On startup, check current lid state and emit a synthetic event if lid is closed
         # This handles the case where the service restarts while
@@ -284,9 +284,6 @@ let
         	printf 'event=lidClosed\nextPower=%s\nts=%s\n' \
         		"$_startup_extPower" "$_startup_ts" > "$_startup_file" || true
         fi
-
-        log "found files: $(ls -1 "$EVENT_DIR"/*.env 2>/dev/null | wc -l)"
-        _last="$(last_seen)"
 
         log "starting (pollInterval=${toString cfg.pollIntervalSeconds}s)"
         _last="$(check_lid)"
