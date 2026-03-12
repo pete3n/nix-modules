@@ -44,6 +44,7 @@ let
 
         INT_CFG=${cfg.intDisplay}
         INT_DISP_FILE="$STATE_DIR/int_display"
+        INT_DISP_DISABLED_FILE="$STATE_DIR/int_display_disabled"
         INT_DISP=${cfg.intDisplay}
 
         if [ -z "''${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
@@ -59,7 +60,7 @@ let
 
         log() {
         	${lib.optionalString cfg.logToJournal ''
-           			printf "hyprlidmon: %s\n" "$*" >&2
+           				printf "hyprlidmon: %s\n" "$*" >&2
          ''}
         }
 
@@ -113,10 +114,17 @@ let
         		return 1
         }
 
-        INT_DISP="$(get_internal 2>/dev/null || true)"
-        if [ -z "''${INT_DISP}" ]; then
-        		log "warning: could not determine internal display; external detection may be unreliable."
-        fi
+        disable_internal() {
+        		log "disabling internal display: $INT_DISP"
+        		${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,disable" >/dev/null 2>&1 || true
+        		touch "$INT_DISP_DISABLED_FILE"
+        }
+
+        enable_internal() {
+        		log "enabling internal display: $INT_DISP"
+        		${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,preferred,auto,1" >/dev/null 2>&1 || true
+        		rm -f "$INT_DISP_DISABLED_FILE"
+        }
 
         run_cmd_list() {
         	for _cmd in "$@"; do
@@ -159,6 +167,7 @@ let
         last_seen() {
         	[ -r "$LAST_FILE" ] && cat "$LAST_FILE" || true
         }
+
         set_last_seen() {
         	printf '%s\n' "$1" > "$LAST_FILE"
         }
@@ -171,18 +180,18 @@ let
         }
 
         have_external() {
-        		if [ -z "''${INT_DISP}" ]; then
-        				log "have_external: INT_DISP unknown; assuming no external display"
-        				return 1
-        		fi
-        		_mons="$(${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null)" || {
-        log "have_external: hyprctl failed (HYPRLAND_INSTANCE_SIGNATURE=''${HYPRLAND_INSTANCE_SIGNATURE:-<unset>})"
-        return 1
-        }
-        printf '%s' "''${_mons}" \
-        | ${pkgs.jq}/bin/jq -e --arg i "''${INT_DISP}" \
-        		'map(select(.name != $i and .disabled == false)) | length > 0' \
-        >/dev/null 2>&1 || return 1
+        	if [ -z "''${INT_DISP}" ]; then
+        			log "have_external: INT_DISP unknown; assuming no external display"
+        			return 1
+        	fi
+        	_mons="$(${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null)" || {
+        		log "have_external: hyprctl failed (HYPRLAND_INSTANCE_SIGNATURE=''${HYPRLAND_INSTANCE_SIGNATURE:-<unset>})"
+        		return 1
+        	}
+        	printf '%s' "''${_mons}" \
+        	| ${pkgs.jq}/bin/jq -e --arg i "''${INT_DISP}" \
+        			'map(select(.name != $i and .disabled == false)) | length > 0' \
+        	>/dev/null 2>&1 || return 1
         }
 
         int_display_disable() {
@@ -232,13 +241,13 @@ let
                in
                # sh
                ''
-                 								if ${condExpr}; then
-                 									log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
-                 									run_cmd_list ${closeArgs}
-                 									store_open_cmds ${openArgs}
-                 									return 0
-                 								fi
-                 							''
+                 												if ${condExpr}; then
+                 													log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
+                 													run_cmd_list ${closeArgs}
+                 													store_open_cmds ${openArgs}
+                 													return 0
+                 												fi
+                 											''
              ) cfg.rules
            )
          }
@@ -263,6 +272,18 @@ let
         log "starting; eventDir=$EVENT_DIR poll=$POLL"
         log "scan: eventDir=$EVENT_DIR"
         log "found files: $(ls -1 "$EVENT_DIR"/*.env 2>/dev/null | wc -l)"
+
+        INT_DISP="$(get_internal 2>/dev/null || true)"
+        if [ -z "''${INT_DISP}" ]; then
+        		log "warning: could not determine internal display; external detection may be unreliable."
+        fi
+
+        # Restore display state after restart (e.g. home-manager rebuild)
+        if [ -f "$INT_DISP_DISABLED_FILE" ]; then
+        		log "startup: restoring disabled internal display"
+        		disable_internal
+        fi
+
         _last="$(last_seen)"
 
         while true; do
