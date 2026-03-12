@@ -479,11 +479,11 @@ in
       };
       Install.WantedBy = [ "default.target" ];
     };
-  };
 
-  home.activation.restartHyprlidmon = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    if $DRY_RUN_CMD systemctl --user is-active --quiet hyprlidmon 2>/dev/null; then
-      $DRY_RUN_CMD systemctl --user restart hyprlidmon
-    fi
-  '';
+    home.activation.restartHyprlidmon = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      if $DRY_RUN_CMD systemctl --user is-active --quiet hyprlidmon 2>/dev/null; then
+        $DRY_RUN_CMD systemctl --user restart hyprlidmon
+      fi
+    '';
+  };
 }
