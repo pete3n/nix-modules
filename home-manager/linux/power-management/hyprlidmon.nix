@@ -30,271 +30,271 @@ let
   hyprlidmon =
     pkgs.writeShellScriptBin "hyprlidmon" # sh
       ''
-        	set -eu
+        set -eu
 
-        	EVENT_DIR=${cfg.eventDir}
-        	POLL=${toString cfg.pollIntervalSeconds}
+        EVENT_DIR=${cfg.eventDir}
+        POLL=${toString cfg.pollIntervalSeconds}
 
-        	STATE_DIR="''${XDG_STATE_HOME:-$HOME/.local/state}/hyprlidmon"
-        	LAST_FILE="$STATE_DIR/last_seen"
-        	OPEN_CMDS_FILE="$STATE_DIR/open_cmds"
+        STATE_DIR="''${XDG_STATE_HOME:-$HOME/.local/state}/hyprlidmon"
+        LAST_FILE="$STATE_DIR/last_seen"
+        OPEN_CMDS_FILE="$STATE_DIR/open_cmds"
 
-        	${pkgs.coreutils}/bin/mkdir -p "$STATE_DIR"
-        	[ -e "$OPEN_CMDS_FILE" ] || : > "$OPEN_CMDS_FILE"
+        ${pkgs.coreutils}/bin/mkdir -p "$STATE_DIR"
+        [ -e "$OPEN_CMDS_FILE" ] || : > "$OPEN_CMDS_FILE"
 
-        	INT_CFG=${cfg.intDisplay}
-        	INT_DISP_FILE="$STATE_DIR/int_display"
-        	INT_DISP=${cfg.intDisplay}
+        INT_CFG=${cfg.intDisplay}
+        INT_DISP_FILE="$STATE_DIR/int_display"
+        INT_DISP=${cfg.intDisplay}
 
-        	if [ -z "''${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
-        		_sig="$(ls -t /tmp/hypr/ 2>/dev/null | head -n1 || true)"
-        		[ -n "''${_sig}" ] && export HYPRLAND_INSTANCE_SIGNATURE="''${_sig}"
-        	fi
+        if [ -z "''${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+        	_sig="$(ls -t /tmp/hypr/ 2>/dev/null | head -n1 || true)"
+        	[ -n "''${_sig}" ] && export HYPRLAND_INSTANCE_SIGNATURE="''${_sig}"
+        fi
 
-        	ts=""
-        	event=""
-        	lid=""
-        	extPower=""
-        	extDisplay=""
+        ts=""
+        event=""
+        lid=""
+        extPower=""
+        extDisplay=""
 
-        	log() {
-        		${lib.optionalString cfg.logToJournal ''
-            	printf "hyprlidmon: %s\n" "$*" >&2
-          ''}
-        	}
+        log() {
+        	${lib.optionalString cfg.logToJournal ''
+           		printf "hyprlidmon: %s\n" "$*" >&2
+         ''}
+        }
 
-        	# Best-effort to autodetect internal display, first match wins
-        	detect_internal() {
-        			_mons="$(${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null)" || return 1
+        # Best-effort to autodetect internal display, first match wins
+        detect_internal() {
+        		_mons="$(${pkgs.hyprland}/bin/hyprctl monitors all -j 2>/dev/null)" || return 1
 
-        			# Match eDP or LVDS prefix — covers virtually all internal laptop panels
-        			_int="$(printf '%s' "$_mons" | ${pkgs.jq}/bin/jq -r '
-        					[ .[] | .name ] | map(select(test("^(eDP|LVDS)-"))) | .[0] // empty
-        			' 2>/dev/null)" || true
-        			[ -n "$_int" ] && printf '%s\n' "$_int" && return 0
+        		# Match eDP or LVDS prefix — covers virtually all internal laptop panels
+        		_int="$(printf '%s' "$_mons" | ${pkgs.jq}/bin/jq -r '
+        				[ .[] | .name ] | map(select(test("^(eDP|LVDS)-"))) | .[0] // empty
+        		' 2>/dev/null)" || true
+        		[ -n "$_int" ] && printf '%s\n' "$_int" && return 0
 
-        			# If only one enabled monitor exists, assume it's the internal
-        			_int="$(printf '%s' "$_mons" \
-        					| ${pkgs.jq}/bin/jq -r '
-        							[ .[] | select(.disabled == false) | .name ] as $n
-        							| if ($n | length) == 1 then $n[0] else empty end
-        					' 2>/dev/null)" || true
-        			[ -n "$_int" ] && printf '%s\n' "$_int" && return 0
+        		# If only one enabled monitor exists, assume it's the internal
+        		_int="$(printf '%s' "$_mons" \
+        				| ${pkgs.jq}/bin/jq -r '
+        						[ .[] | select(.disabled == false) | .name ] as $n
+        						| if ($n | length) == 1 then $n[0] else empty end
+        				' 2>/dev/null)" || true
+        		[ -n "$_int" ] && printf '%s\n' "$_int" && return 0
 
-        			return 1
-        	}
-
-        	get_internal() {
-        			if [ "$INT_CFG" != "auto" ]; then
-        					printf '%s\n' "$INT_CFG"
-        					return 0
-        			fi
-
-        			# Trust the cache unconditionally — the internal display may be absent
-        			# from hyprctl output if currently disabled (e.g. docked with lid closed)
-        			if [ -r "$INT_DISP_FILE" ]; then
-        					_cached="$(cat "$INT_DISP_FILE" 2>/dev/null || true)"
-        					if [ -n "$_cached" ]; then
-        							printf '%s\n' "$_cached"
-        							return 0
-        					fi
-        			fi
-
-        			if _det="$(detect_internal 2>/dev/null || true)"; then
-        					if [ -n "$_det" ]; then
-        							printf '%s\n' "$_det" > "$INT_DISP_FILE"
-        							log "auto-detected internal display: $_det"
-        							printf '%s\n' "$_det"
-        							return 0
-        					fi
-        			fi
-
-        			log "internal display auto-detect failed. Try manually setting the intDisplay option."
-        			return 1
-        	}
-
-        	INT_DISP="$(get_internal 2>/dev/null || true)"
-        	if [ -z "''${INT_DISP}" ]; then
-        			log "warning: could not determine internal display; external detection may be unreliable."
-        	fi
-
-        	run_cmd_list() {
-        		for _cmd in "$@"; do
-        			[ -n "''${_cmd}" ] || continue
-
-        			case "$_cmd" in
-        				--int-display-disable)
-        					int_display_disable
-        					;;
-        				--int-display-enable)
-        					int_display_enable
-        					;;
-        				--*)
-        					log "unknown internal command: $_cmd"
-        					;;
-        				*)
-        					log "exec: ''${_cmd}"
-        					${pkgs.runtimeShell} -c "''${_cmd}" || true
-        					;;
-        			esac
-        		done
-        	}
-
-        	store_open_cmds() {
-        		: > "$OPEN_CMDS_FILE"
-        		for _cmd in "$@"; do
-        			printf '%s\n' "$_cmd" >> "$OPEN_CMDS_FILE"
-        		done
-        	}
-
-        	run_stored_open_cmds() {
-        		[ -r "$OPEN_CMDS_FILE" ] || return 0
-        		while IFS= read -r _cmd; do
-        			[ -n "$_cmd" ] || continue
-        			run_cmd_list "$_cmd"
-        		done < "$OPEN_CMDS_FILE"
-        		: > "$OPEN_CMDS_FILE"
-        	}
-
-        	last_seen() {
-        		[ -r "$LAST_FILE" ] && cat "$LAST_FILE" || true
-        	}
-        	set_last_seen() {
-        		printf '%s\n' "$1" > "$LAST_FILE"
-        	}
-
-        	read_event_file() {
-        		ts=""; event=""; lid=""; extPower=""
-        		# shellcheck disable=SC1090
-        		. "$1" 2>/dev/null || true
-        		[ -n "$event" ]
-        	}
-
-        	have_external() {
-        		_mons="$(${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null)" || {
-        		log "have_external: hyprctl failed (HYPRLAND_INSTANCE_SIGNATURE=''${HYPRLAND_INSTANCE_SIGNATURE:-<unset>})"
         		return 1
-        		}
-        		printf '%s' "''${_mons}" \
-        		| ${pkgs.jq}/bin/jq -e --arg i "''${INT_DISP}" \
-        				'map(select(.name != $i and .disabled == false)) | length > 0' \
-        		>/dev/null 2>&1 || return 1
-        	}
+        }
 
-        	int_display_disable() {
-        		log "disabling internal display: $INT_DISP"
-        		${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,disable" >/dev/null 2>&1 || true
-        	}
-
-        	int_display_enable() {
-        		log "enabling internal display: $INT_DISP"
-        		${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,preferred,auto,1" >/dev/null 2>&1 || true
-        	}
-
-        	handle_lidClosed() {
-        		extDisplay=0
-        		if have_external; then
-        			extDisplay=1
-        		fi
-        		log "extDisplay=$extDisplay"
-
-        		${
-            lib.concatStringsSep "\n" (
-              map (
-                rule:
-                let
-                  conds = rule.cond or [ ];
-                  closeCmds = rule.closeCmd or [ ];
-                  openCmds = rule.openCmd or [ ];
-
-                  condExpr =
-                    if conds == [ ] then
-                      "true"
-                    else
-                      lib.concatStringsSep " && " (
-                        map (
-                          cond:
-                          if cond == "extPower" then
-                            "[ \"${"$"}{extPower:-0}\" = \"1\" ]"
-                          else if cond == "extDisplay" then
-                            "[ \"${"$"}{extDisplay:-0}\" = \"1\" ]"
-                          else
-                            "false"
-                        ) conds
-                      );
-
-                  closeArgs = lib.concatStringsSep " " (map lib.escapeShellArg closeCmds);
-                  openArgs = lib.concatStringsSep " " (map lib.escapeShellArg openCmds);
-                in
-                # sh
-                ''
-                  if ${condExpr}; then
-                  	log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
-                  	run_cmd_list ${closeArgs}
-                  	store_open_cmds ${openArgs}
-                  	return 0
-                  fi
-                ''
-              ) cfg.rules
-            )
-          }
-
-        		# no rule matched
-        		${
-            lib.optionalString (cfg.lidClosedDefaultCmd != ":") # sh
-              ''log "lidClosed no condition matched; using default" ''
-          }
-
-        		run_cmd_list ${lib.escapeShellArg cfg.lidClosedDefaultCmd}
-        		return 0
-        	}
-
-        	handle_lidOpened() {
-        		# run stored open cmds first (close-time decision)
-        		run_stored_open_cmds
-        		run_cmd_list ${lib.escapeShellArg cfg.lidOpenedDefaultCmd}
-        		return 0
-        	}
-
-        	log "starting; eventDir=$EVENT_DIR poll=$POLL"
-        	log "scan: eventDir=$EVENT_DIR"
-        	log "found files: $(ls -1 "$EVENT_DIR"/*.env 2>/dev/null | wc -l)"
-        	_last="$(last_seen)"
-
-        	while true; do
-        		if [ ! -d "$EVENT_DIR" ]; then
-        			${pkgs.coreutils}/bin/sleep 1
-        			continue
+        get_internal() {
+        		if [ "$INT_CFG" != "auto" ]; then
+        				printf '%s\n' "$INT_CFG"
+        				return 0
         		fi
 
-        		# Process events in lexicographic order (timestamp-prefix makes this work)
-        		for _file in "$EVENT_DIR"/*.env; do
-        			[ -e "$_file" ] || break
-        			_base="$(${pkgs.coreutils}/bin/basename "$_file")"
+        		# Trust the cache unconditionally — the internal display may be absent
+        		# from hyprctl output if currently disabled (e.g. docked with lid closed)
+        		if [ -r "$INT_DISP_FILE" ]; then
+        				_cached="$(cat "$INT_DISP_FILE" 2>/dev/null || true)"
+        				if [ -n "$_cached" ]; then
+        						printf '%s\n' "$_cached"
+        						return 0
+        				fi
+        		fi
 
-        			# skip if <= last
-        			if [ -n "$_last" ]; then
-        				[ "$_base" \> "$_last" ] || continue
-        			fi
+        		if _det="$(detect_internal 2>/dev/null || true)"; then
+        				if [ -n "$_det" ]; then
+        						printf '%s\n' "$_det" > "$INT_DISP_FILE"
+        						log "auto-detected internal display: $_det"
+        						printf '%s\n' "$_det"
+        						return 0
+        				fi
+        		fi
 
-        			log "reading: $_file"
-        			if ! read_event_file "$_file"; then
-        					log "skipped (invalid/unreadable): $_file"
-        					continue
-        			fi
-        			log "parsed: event=$event extPower=''${extPower:-}"
+        		log "internal display auto-detect failed. Try manually setting the intDisplay option."
+        		return 1
+        }
 
-        			case "$event" in
-        					lidClosed) handle_lidClosed ;;
-        					lidOpened) handle_lidOpened ;;
-        			esac
+        INT_DISP="$(get_internal 2>/dev/null || true)"
+        if [ -z "''${INT_DISP}" ]; then
+        		log "warning: could not determine internal display; external detection may be unreliable."
+        fi
 
-        			_last="$_base"
-        			set_last_seen "$_last"
-        		done
+        run_cmd_list() {
+        	for _cmd in "$@"; do
+        		[ -n "''${_cmd}" ] || continue
 
-        		${pkgs.coreutils}/bin/sleep "$POLL"
+        		case "$_cmd" in
+        			--int-display-disable)
+        				int_display_disable
+        				;;
+        			--int-display-enable)
+        				int_display_enable
+        				;;
+        			--*)
+        				log "unknown internal command: $_cmd"
+        				;;
+        			*)
+        				log "exec: ''${_cmd}"
+        				${pkgs.runtimeShell} -c "''${_cmd}" || true
+        				;;
+        		esac
         	done
+        }
+
+        store_open_cmds() {
+        	: > "$OPEN_CMDS_FILE"
+        	for _cmd in "$@"; do
+        		printf '%s\n' "$_cmd" >> "$OPEN_CMDS_FILE"
+        	done
+        }
+
+        run_stored_open_cmds() {
+        	[ -r "$OPEN_CMDS_FILE" ] || return 0
+        	while IFS= read -r _cmd; do
+        		[ -n "$_cmd" ] || continue
+        		run_cmd_list "$_cmd"
+        	done < "$OPEN_CMDS_FILE"
+        	: > "$OPEN_CMDS_FILE"
+        }
+
+        last_seen() {
+        	[ -r "$LAST_FILE" ] && cat "$LAST_FILE" || true
+        }
+        set_last_seen() {
+        	printf '%s\n' "$1" > "$LAST_FILE"
+        }
+
+        read_event_file() {
+        	ts=""; event=""; lid=""; extPower=""
+        	# shellcheck disable=SC1090
+        	. "$1" 2>/dev/null || true
+        	[ -n "$event" ]
+        }
+
+        have_external() {
+        	_mons="$(${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null)" || {
+        	log "have_external: hyprctl failed (HYPRLAND_INSTANCE_SIGNATURE=''${HYPRLAND_INSTANCE_SIGNATURE:-<unset>})"
+        	return 1
+        	}
+        	printf '%s' "''${_mons}" \
+        	| ${pkgs.jq}/bin/jq -e --arg i "''${INT_DISP}" \
+        			'map(select(.name != $i and .disabled == false)) | length > 0' \
+        	>/dev/null 2>&1 || return 1
+        }
+
+        int_display_disable() {
+        	log "disabling internal display: $INT_DISP"
+        	${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,disable" >/dev/null 2>&1 || true
+        }
+
+        int_display_enable() {
+        	log "enabling internal display: $INT_DISP"
+        	${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,preferred,auto,1" >/dev/null 2>&1 || true
+        }
+
+        handle_lidClosed() {
+        	extDisplay=0
+        	if have_external; then
+        		extDisplay=1
+        	fi
+        	log "extDisplay=$extDisplay"
+
+        	${
+           lib.concatStringsSep "\n" (
+             map (
+               rule:
+               let
+                 conds = rule.cond or [ ];
+                 closeCmds = rule.closeCmd or [ ];
+                 openCmds = rule.openCmd or [ ];
+
+                 condExpr =
+                   if conds == [ ] then
+                     "true"
+                   else
+                     lib.concatStringsSep " && " (
+                       map (
+                         cond:
+                         if cond == "extPower" then
+                           "[ \"${"$"}{extPower:-0}\" = \"1\" ]"
+                         else if cond == "extDisplay" then
+                           "[ \"${"$"}{extDisplay:-0}\" = \"1\" ]"
+                         else
+                           "false"
+                       ) conds
+                     );
+
+                 closeArgs = lib.concatStringsSep " " (map lib.escapeShellArg closeCmds);
+                 openArgs = lib.concatStringsSep " " (map lib.escapeShellArg openCmds);
+               in
+               # sh
+               ''
+                 				if ${condExpr}; then
+                 					log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
+                 					run_cmd_list ${closeArgs}
+                 					store_open_cmds ${openArgs}
+                 					return 0
+                 				fi
+                 			''
+             ) cfg.rules
+           )
+         }
+
+        	# no rule matched
+        	${
+           lib.optionalString (cfg.lidClosedDefaultCmd != ":") # sh
+             ''log "lidClosed no condition matched; using default" ''
+         }
+
+        	run_cmd_list ${lib.escapeShellArg cfg.lidClosedDefaultCmd}
+        	return 0
+        }
+
+        handle_lidOpened() {
+        	# run stored open cmds first (close-time decision)
+        	run_stored_open_cmds
+        	run_cmd_list ${lib.escapeShellArg cfg.lidOpenedDefaultCmd}
+        	return 0
+        }
+
+        log "starting; eventDir=$EVENT_DIR poll=$POLL"
+        log "scan: eventDir=$EVENT_DIR"
+        log "found files: $(ls -1 "$EVENT_DIR"/*.env 2>/dev/null | wc -l)"
+        _last="$(last_seen)"
+
+        while true; do
+        	if [ ! -d "$EVENT_DIR" ]; then
+        		${pkgs.coreutils}/bin/sleep 1
+        		continue
+        	fi
+
+        	# Process events in lexicographic order (timestamp-prefix makes this work)
+        	for _file in "$EVENT_DIR"/*.env; do
+        		[ -e "$_file" ] || break
+        		_base="$(${pkgs.coreutils}/bin/basename "$_file")"
+
+        		# skip if <= last
+        		if [ -n "$_last" ]; then
+        			[ "$_base" \> "$_last" ] || continue
+        		fi
+
+        		log "reading: $_file"
+        		if ! read_event_file "$_file"; then
+        				log "skipped (invalid/unreadable): $_file"
+        				continue
+        		fi
+        		log "parsed: event=$event extPower=''${extPower:-}"
+
+        		case "$event" in
+        				lidClosed) handle_lidClosed ;;
+        				lidOpened) handle_lidOpened ;;
+        		esac
+
+        		_last="$_base"
+        		set_last_seen "$_last"
+        	done
+
+        	${pkgs.coreutils}/bin/sleep "$POLL"
+        done
       '';
 
   hyprlidmonWrapper =
