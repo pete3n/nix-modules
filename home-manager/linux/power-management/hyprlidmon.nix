@@ -60,70 +60,70 @@ let
 
         log() {
         	${lib.optionalString cfg.logToJournal ''
-           				printf "hyprlidmon: %s\n" "$*" >&2
+           					printf "hyprlidmon: %s\n" "$*" >&2
          ''}
         }
 
         # Best-effort to autodetect internal display, first match wins
         detect_internal() {
-        		_mons="$(${pkgs.hyprland}/bin/hyprctl monitors all -j 2>/dev/null)" || return 1
+        	_mons="$(${pkgs.hyprland}/bin/hyprctl monitors all -j 2>/dev/null)" || return 1
 
-        		# Match eDP or LVDS prefix — covers virtually all internal laptop panels
-        		_int="$(printf '%s' "$_mons" | ${pkgs.jq}/bin/jq -r '
-        				[ .[] | .name ] | map(select(test("^(eDP|LVDS)-"))) | .[0] // empty
-        		' 2>/dev/null)" || true
-        		[ -n "$_int" ] && printf '%s\n' "$_int" && return 0
+        	# Match eDP or LVDS prefix — covers virtually all internal laptop panels
+        	_int="$(printf '%s' "$_mons" | ${pkgs.jq}/bin/jq -r '
+        			[ .[] | .name ] | map(select(test("^(eDP|LVDS)-"))) | .[0] // empty
+        	' 2>/dev/null)" || true
+        	[ -n "$_int" ] && printf '%s\n' "$_int" && return 0
 
-        		# If only one enabled monitor exists, assume it's the internal
-        		_int="$(printf '%s' "$_mons" \
-        				| ${pkgs.jq}/bin/jq -r '
-        				[ .[] | select(.disabled == true) | .name ] as $n
-        				| if ($n | length) == 1 then $n[0] else empty end
-        				' 2>/dev/null)" || true
-        		[ -n "$_int" ] && printf '%s\n' "$_int" && return 0
+        	# If only one enabled monitor exists, assume it's the internal
+        	_int="$(printf '%s' "$_mons" \
+        			| ${pkgs.jq}/bin/jq -r '
+        			[ .[] | select(.disabled == true) | .name ] as $n
+        			| if ($n | length) == 1 then $n[0] else empty end
+        			' 2>/dev/null)" || true
+        	[ -n "$_int" ] && printf '%s\n' "$_int" && return 0
 
-        		return 1
+        	return 1
         }
 
         get_internal() {
-        		if [ "$INT_CFG" != "auto" ]; then
-        				printf '%s\n' "$INT_CFG"
-        				return 0
-        		fi
+        	if [ "$INT_CFG" != "auto" ]; then
+        			printf '%s\n' "$INT_CFG"
+        			return 0
+        	fi
 
-        		# Trust the cache unconditionally — the internal display may be absent
-        		# from hyprctl output if currently disabled (e.g. docked with lid closed)
-        		if [ -r "$INT_DISP_FILE" ]; then
-        				_cached="$(cat "$INT_DISP_FILE" 2>/dev/null || true)"
-        				if [ -n "$_cached" ]; then
-        						printf '%s\n' "$_cached"
-        						return 0
-        				fi
-        		fi
+        	# Trust the cache unconditionally — the internal display may be absent
+        	# from hyprctl output if currently disabled (e.g. docked with lid closed)
+        	if [ -r "$INT_DISP_FILE" ]; then
+        			_cached="$(cat "$INT_DISP_FILE" 2>/dev/null || true)"
+        			if [ -n "$_cached" ]; then
+        					printf '%s\n' "$_cached"
+        					return 0
+        			fi
+        	fi
 
-        		if _det="$(detect_internal 2>/dev/null || true)"; then
-        				if [ -n "$_det" ]; then
-        						printf '%s\n' "$_det" > "$INT_DISP_FILE"
-        						log "auto-detected internal display: $_det"
-        						printf '%s\n' "$_det"
-        						return 0
-        				fi
-        		fi
+        	if _det="$(detect_internal 2>/dev/null || true)"; then
+        			if [ -n "$_det" ]; then
+        					printf '%s\n' "$_det" > "$INT_DISP_FILE"
+        					log "auto-detected internal display: $_det"
+        					printf '%s\n' "$_det"
+        					return 0
+        			fi
+        	fi
 
-        		log "internal display auto-detect failed. Try manually setting the intDisplay option."
-        		return 1
+        	log "internal display auto-detect failed. Try manually setting the intDisplay option."
+        	return 1
         }
 
         disable_internal() {
-        		log "disabling internal display: $INT_DISP"
-        		${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,disable" >/dev/null 2>&1 || true
-        		touch "$INT_DISP_DISABLED_FILE"
+        	log "disabling internal display: $INT_DISP"
+        	${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,disable" >/dev/null 2>&1 || true
+        	touch "$INT_DISP_DISABLED_FILE"
         }
 
         enable_internal() {
-        		log "enabling internal display: $INT_DISP"
-        		${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,preferred,auto,1" >/dev/null 2>&1 || true
-        		rm -f "$INT_DISP_DISABLED_FILE"
+        	log "enabling internal display: $INT_DISP"
+        	${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,preferred,auto,1" >/dev/null 2>&1 || true
+        	rm -f "$INT_DISP_DISABLED_FILE"
         }
 
         run_cmd_list() {
@@ -231,13 +231,13 @@ let
                in
                # sh
                ''
-                 												if ${condExpr}; then
-                 													log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
-                 													run_cmd_list ${closeArgs}
-                 													store_open_cmds ${openArgs}
-                 													return 0
-                 												fi
-                 											''
+                 if ${condExpr}; then
+                 	log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
+                 	run_cmd_list ${closeArgs}
+                 	store_open_cmds ${openArgs}
+                 	return 0
+                 fi
+               ''
              ) cfg.rules
            )
          }
