@@ -59,7 +59,7 @@ let
 
         log() {
         	${lib.optionalString cfg.logToJournal ''
-           		printf "hyprlidmon: %s\n" "$*" >&2
+           			printf "hyprlidmon: %s\n" "$*" >&2
          ''}
         }
 
@@ -76,8 +76,8 @@ let
         		# If only one enabled monitor exists, assume it's the internal
         		_int="$(printf '%s' "$_mons" \
         				| ${pkgs.jq}/bin/jq -r '
-        						[ .[] | select(.disabled == false) | .name ] as $n
-        						| if ($n | length) == 1 then $n[0] else empty end
+        				[ .[] | select(.disabled == true) | .name ] as $n
+        				| if ($n | length) == 1 then $n[0] else empty end
         				' 2>/dev/null)" || true
         		[ -n "$_int" ] && printf '%s\n' "$_int" && return 0
 
@@ -171,14 +171,18 @@ let
         }
 
         have_external() {
-        	_mons="$(${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null)" || {
-        	log "have_external: hyprctl failed (HYPRLAND_INSTANCE_SIGNATURE=''${HYPRLAND_INSTANCE_SIGNATURE:-<unset>})"
-        	return 1
-        	}
-        	printf '%s' "''${_mons}" \
-        	| ${pkgs.jq}/bin/jq -e --arg i "''${INT_DISP}" \
-        			'map(select(.name != $i and .disabled == false)) | length > 0' \
-        	>/dev/null 2>&1 || return 1
+        		if [ -z "''${INT_DISP}" ]; then
+        				log "have_external: INT_DISP unknown; assuming no external display"
+        				return 1
+        		fi
+        		_mons="$(${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null)" || {
+        log "have_external: hyprctl failed (HYPRLAND_INSTANCE_SIGNATURE=''${HYPRLAND_INSTANCE_SIGNATURE:-<unset>})"
+        return 1
+        }
+        printf '%s' "''${_mons}" \
+        | ${pkgs.jq}/bin/jq -e --arg i "''${INT_DISP}" \
+        		'map(select(.name != $i and .disabled == false)) | length > 0' \
+        >/dev/null 2>&1 || return 1
         }
 
         int_display_disable() {
@@ -228,13 +232,13 @@ let
                in
                # sh
                ''
-                 				if ${condExpr}; then
-                 					log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
-                 					run_cmd_list ${closeArgs}
-                 					store_open_cmds ${openArgs}
-                 					return 0
-                 				fi
-                 			''
+                 								if ${condExpr}; then
+                 									log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
+                 									run_cmd_list ${closeArgs}
+                 									store_open_cmds ${openArgs}
+                 									return 0
+                 								fi
+                 							''
              ) cfg.rules
            )
          }
