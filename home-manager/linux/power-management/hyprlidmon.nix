@@ -60,7 +60,7 @@ let
 
         log() {
         	${lib.optionalString cfg.logToJournal ''
-           					printf "hyprlidmon: %s\n" "$*" >&2
+           							printf "hyprlidmon: %s\n" "$*" >&2
          ''}
         }
 
@@ -124,6 +124,25 @@ let
         	log "enabling internal display: $INT_DISP"
         	${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,preferred,auto,1" >/dev/null 2>&1 || true
         	rm -f "$INT_DISP_DISABLED_FILE"
+        }
+
+        watch_hyprland_reloads() {
+        	while true; do
+        		${pkgs.socat}/bin/socat -u \
+        				"UNIX-CONNECT:/tmp/hypr/''${HYPRLAND_INSTANCE_SIGNATURE}/.socket2.sock" - \
+        				2>/dev/null \
+        		| while IFS= read -r _evt; do
+        				case "$_evt" in
+        					configreloaded*)
+        						if [ -f "$INT_DISP_DISABLED_FILE" ]; then
+        							log "configreloaded: re-applying disabled internal display"
+        							disable_internal
+        						fi
+        						;;
+        				esac
+        		done
+        		${pkgs.coreutils}/bin/sleep 1
+        	done
         }
 
         run_cmd_list() {
@@ -232,10 +251,10 @@ let
                # sh
                ''
                  if ${condExpr}; then
-                 	log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
-                 	run_cmd_list ${closeArgs}
-                 	store_open_cmds ${openArgs}
-                 	return 0
+                 log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
+                 run_cmd_list ${closeArgs}
+                 store_open_cmds ${openArgs}
+                 return 0
                  fi
                ''
              ) cfg.rules
@@ -275,6 +294,7 @@ let
         fi
 
         _last="$(last_seen)"
+        watch_hyprland_reloads &
 
         while true; do
         	if [ ! -d "$EVENT_DIR" ]; then
