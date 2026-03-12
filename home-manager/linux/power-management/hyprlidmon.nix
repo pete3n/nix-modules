@@ -132,10 +132,10 @@ let
 
         		case "$_cmd" in
         			--int-display-disable)
-        				int_display_disable
+        				disable_internal
         				;;
         			--int-display-enable)
-        				int_display_enable
+        				enable_internal
         				;;
         			--*)
         				log "unknown internal command: $_cmd"
@@ -192,16 +192,6 @@ let
         	| ${pkgs.jq}/bin/jq -e --arg i "''${INT_DISP}" \
         			'map(select(.name != $i and .disabled == false)) | length > 0' \
         	>/dev/null 2>&1 || return 1
-        }
-
-        int_display_disable() {
-        	log "disabling internal display: $INT_DISP"
-        	${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,disable" >/dev/null 2>&1 || true
-        }
-
-        int_display_enable() {
-        	log "enabling internal display: $INT_DISP"
-        	${pkgs.hyprland}/bin/hyprctl keyword monitor "$INT_DISP,preferred,auto,1" >/dev/null 2>&1 || true
         }
 
         handle_lidClosed() {
