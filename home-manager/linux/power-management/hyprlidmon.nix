@@ -185,7 +185,7 @@ let
 								return 1
 						fi
 						_mons="$(${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null)" || {
-								log "have_external: hyprctl failed (HYPRLAND_INSTANCE_SIGNATURE=${HYPRLAND_INSTANCE_SIGNATURE:-<unset>})"
+								log "have_external: hyprctl failed (HYPRLAND_INSTANCE_SIGNATURE=''${HYPRLAND_INSTANCE_SIGNATURE:-<unset>})"
 								return 1
 						}
 						printf '%s' "''${_mons}" \
