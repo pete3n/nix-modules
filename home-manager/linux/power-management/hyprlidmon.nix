@@ -179,20 +179,20 @@ let
         	[ -n "$event" ]
         }
 
-        have_external() {
-						if [ -z "''${INT_DISP}" ]; then
-								INT_DISP="$(get_internal 2>/dev/null || true)"
-						fi
+				have_external() {
 						if [ -z "''${INT_DISP}" ]; then
 								log "have_external: INT_DISP unknown; assuming no external display"
 								return 1
 						fi
-        	}
-        	printf '%s' "''${_mons}" \
-        	| ${pkgs.jq}/bin/jq -e --arg i "''${INT_DISP}" \
-        			'map(select(.name != $i and .disabled == false)) | length > 0' \
-        	>/dev/null 2>&1 || return 1
-        }
+						_mons="$(${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null)" || {
+								log "have_external: hyprctl failed (HYPRLAND_INSTANCE_SIGNATURE=${HYPRLAND_INSTANCE_SIGNATURE:-<unset>})"
+								return 1
+						}
+						printf '%s' "''${_mons}" \
+						| ${pkgs.jq}/bin/jq -e --arg i "''${INT_DISP}" \
+										'map(select(.name != $i and .disabled == false)) | length > 0' \
+						>/dev/null 2>&1 || return 1
+				}
 
         handle_lidClosed() {
         	extDisplay=0
