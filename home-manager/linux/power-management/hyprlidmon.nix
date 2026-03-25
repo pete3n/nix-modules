@@ -180,13 +180,13 @@ let
         }
 
         have_external() {
-        	if [ -z "''${INT_DISP}" ]; then
-        			log "have_external: INT_DISP unknown; assuming no external display"
-        			return 1
-        	fi
-        	_mons="$(${pkgs.hyprland}/bin/hyprctl monitors -j 2>/dev/null)" || {
-        		log "have_external: hyprctl failed (HYPRLAND_INSTANCE_SIGNATURE=''${HYPRLAND_INSTANCE_SIGNATURE:-<unset>})"
-        		return 1
+						if [ -z "''${INT_DISP}" ]; then
+								INT_DISP="$(get_internal 2>/dev/null || true)"
+						fi
+						if [ -z "''${INT_DISP}" ]; then
+								log "have_external: INT_DISP unknown; assuming no external display"
+								return 1
+						fi
         	}
         	printf '%s' "''${_mons}" \
         	| ${pkgs.jq}/bin/jq -e --arg i "''${INT_DISP}" \
@@ -415,6 +415,7 @@ in
       default = [ ];
       description = ''
         				User rules evaluated on lidClosed; first match wins.
+								Rules should be ordered most specific to least specific.
         				Service internal switches are provided to disable/enable the internal display with hyprctl:
         					--int-display-disable
         					--int-display-enable
@@ -464,7 +465,11 @@ in
     systemd.user.services."hyprlidmon" = {
       Unit = {
         Description = "lidmond Hyprland user agent";
-        After = [ "default.target" ];
+        After = [
+          "default.target"
+          "hyprland-session.target"
+        ];
+        BindsTo = [ "hyprland-session.target" ];
       };
       Service = {
         Type = "simple";
