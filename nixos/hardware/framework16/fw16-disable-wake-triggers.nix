@@ -8,6 +8,9 @@
   ...
 }:
 
+# Exclusion path changed in kernel 7.0.5 — power button moved from
+# LNXSYSTM:00/LNXSYBUS:00/PNP0C0C:00 to platform/PNP0C0C:00
+# Both patterns included for compatibility with pre-7.0 kernels
 let
   cfg = config.services.fw16-disable-wake-triggers;
   disableWakeTriggers =
@@ -15,10 +18,11 @@ let
       ''
         set -eu
         ${pkgs.findutils}/bin/find /sys/devices -path '*/power/wakeup' \
-          ! -path '*/platform/PNP0C0C:00/*' |
-          while IFS= read -r _wakeup; do
-            echo disabled > "$_wakeup" 2>/dev/null || true
-          done
+        ! -path '*/platform/PNP0C0C:00/*' \
+        ! -path '*/LNXSYBUS:00/PNP0C0C:00/*' |
+        while IFS= read -r _wakeup; do
+        	echo disabled > "$_wakeup" 2>/dev/null || true
+        done      
       '';
 in
 {
