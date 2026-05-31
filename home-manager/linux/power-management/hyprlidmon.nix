@@ -268,10 +268,22 @@ let
         		log "warning: could not determine internal display; external detection may be unreliable."
         fi
 
-        # Restore display state after restart (e.g. home-manager rebuild)
+        # Restore display state after restart (e.g. home-manager rebuild).
+        #
+        # If the internal display was disabled in a previous session (flag file exists),
+        # only re-apply the disable if an external display is still connected
+        # If there is no external display (user undocked with lid closed, or external
+        # display disconnected before the rebuild), re-disabling would produce a black
+        # screen. Instead, run the deferred open commands to restore the display state:
+        # the stored --int-display-enable will re-enable the panel and clear the flag.
         if [ -f "$INT_DISP_DISABLED_FILE" ]; then
-        		log "startup: restoring disabled internal display"
+        	if have_external; then
+        		log "startup: external display present — restoring disabled internal display"
         		disable_internal
+        	else
+        		log "startup: no external display — running deferred open commands to restore display"
+        		run_stored_open_cmds
+        	fi
         fi
 
         _last="$(last_seen)"
