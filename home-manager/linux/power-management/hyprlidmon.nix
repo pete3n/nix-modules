@@ -1,9 +1,9 @@
 # Hyprland user agent for laptop lid events.
 #
-# Companion to the lidmond system-module service: lidmond watches the ACPI lid state
+# Companion to the lidmond SYSTEM service: lidmond watches the ACPI lid state
 # as root and writes event files; this agent reads them inside the Hyprland
 # session and acts on them. The split exists because reading /proc/acpi needs
-# root while hyprctl needs the user's session.
+# root while hyprctl needs the user's session — neither side can do both.
 #
 # The event files are the interface. This module does not talk to lidmond
 # directly, so a different producer writing the same format would work.
@@ -17,8 +17,11 @@
 let
   cfg = config.services.hyprlidmon;
 
-  # hyprctl must come from the compositor that is running, not from whichever
-  # Hyprland nixpkgs happens packages. 
+  # hyprctl must come from the compositor that is RUNNING, not from whichever
+  # Hyprland nixpkgs happens to package. The previous version used
+  # pkgs.hyprland unconditionally — with a pinned or overlaid compositor those
+  # differ, and version-skewed hyprctl against a live instance fails in ways
+  # that read as the socket being wrong.
   hyprPkg = config.wayland.windowManager.hyprland.finalPackage or pkgs.hyprland;
   hyprctl = "${hyprPkg}/bin/hyprctl";
 
@@ -86,14 +89,14 @@ let
 
         log() {
         	${
-             if cfg.logToJournal then
-               ''printf "hyprlidmon: %s\n" "$*" >&2''
-             else
-               # A function body cannot be empty in POSIX sh. The previous
-               # version emitted `log() { }` when logging was disabled, which
-               # is a parse error — the agent failed to start at all.
-               ":"
-           }
+           if cfg.logToJournal then
+             ''printf "hyprlidmon: %s\n" "$*" >&2''
+           else
+             # A function body cannot be empty in POSIX sh. The previous
+             # version emitted `log() { }` when logging was disabled, which
+             # is a parse error — the agent failed to start at all.
+             ":"
+         }
         }
 
         # Best-effort internal panel detection, first match wins.
@@ -148,14 +151,56 @@ let
         	return 1
         }
 
+        # Apply a monitor change and report whether it took.
+        #
+        # `hyprctl keyword` is LEGACY-PARSER ONLY. Under a Lua config it
+        # refuses outright with "keyword can't work with non-legacy parsers"
+        # — and the previous version discarded that message with
+        # `>/dev/null 2>&1 || true`, then wrote the state flag anyway. The
+        # disable silently never happened while the flag claimed it had, so
+        # the startup restore logic acted on a lie.
+        #
+        # `hyprctl eval` takes a Lua expression instead.
+        #
+        # ON `set -e`: the assignment is its own statement and the `|| true`
+        # keeps a non-zero hyprctl exit from killing the agent. Do NOT fold
+        # this into `if _out="$(...)"; then` — a command substitution failing
+        # inside a condition is fine, but the pattern invites someone to drop
+        # the guard later. The exit status is deliberately ignored in favour
+        # of inspecting the OUTPUT, because hyprctl exits 0 while printing an
+        # error for at least this case.
+        apply_monitor() {
+        	_spec="$1"
+        	_out=""
+        	_out="$(${hyprctl} eval "$_spec" 2>&1)" || true
+
+        	case "''${_out}" in
+        		ok*|"")
+        			return 0
+        			;;
+        		*)
+        			log "hyprctl eval failed: ''${_out}"
+        			return 1
+        			;;
+        	esac
+        }
+
         disable_internal() {
         	if [ -z "''${INT_DISP:-}" ]; then
         		log "cannot disable internal display: name unknown"
         		return 0
         	fi
         	log "disabling internal display: $INT_DISP"
-        	${hyprctl} keyword monitor "$INT_DISP,disable" >/dev/null 2>&1 || true
-        	${coreutils}/touch "$INT_DISP_DISABLED_FILE"
+
+        	# The flag is written ONLY on success. It records what the display
+        	# state actually is, and startup restore reads it to decide whether
+        	# to re-apply the disable — a flag written after a failed call would
+        	# make that decision on false information.
+        	if apply_monitor "hl.monitor({ output = '"$INT_DISP"', disabled = true })"; then
+        		${coreutils}/touch "$INT_DISP_DISABLED_FILE"
+        	else
+        		log "internal display remains enabled"
+        	fi
         }
 
         enable_internal() {
@@ -164,7 +209,13 @@ let
         		return 0
         	fi
         	log "enabling internal display: $INT_DISP"
-        	${hyprctl} keyword monitor "$INT_DISP,preferred,auto,1" >/dev/null 2>&1 || true
+
+        	# The flag is cleared UNCONDITIONALLY, unlike the disable case.
+        	# A stale flag after a failed enable would make startup restore
+        	# re-disable a panel the user is trying to get back — the failure
+        	# mode of clearing it wrongly is a redundant enable attempt, which
+        	# is harmless.
+        	apply_monitor "hl.monitor({ output = '"$INT_DISP"', mode = 'preferred', position = 'auto', scale = 1 })" || true
         	${coreutils}/rm -f "$INT_DISP_DISABLED_FILE"
         }
 
@@ -240,50 +291,50 @@ let
         	log "extDisplay=$extDisplay"
 
         	${
-             lib.concatStringsSep "\n" (
-               map (
-                 rule:
-                 let
-                   conds = rule.cond or [ ];
-                   closeCmds = rule.closeCmd or [ ];
-                   openCmds = rule.openCmd or [ ];
+           lib.concatStringsSep "\n" (
+             map (
+               rule:
+               let
+                 conds = rule.cond or [ ];
+                 closeCmds = rule.closeCmd or [ ];
+                 openCmds = rule.openCmd or [ ];
 
-                   condExpr =
-                     if conds == [ ] then
-                       "true"
-                     else
-                       lib.concatStringsSep " && " (
-                         map (
-                           cond:
-                           if cond == "extPower" then
-                             "[ \"${"$"}{extPower:-0}\" = \"1\" ]"
-                           else if cond == "extDisplay" then
-                             "[ \"${"$"}{extDisplay:-0}\" = \"1\" ]"
-                           else
-                             "false"
-                         ) conds
-                       );
+                 condExpr =
+                   if conds == [ ] then
+                     "true"
+                   else
+                     lib.concatStringsSep " && " (
+                       map (
+                         cond:
+                         if cond == "extPower" then
+                           "[ \"${"$"}{extPower:-0}\" = \"1\" ]"
+                         else if cond == "extDisplay" then
+                           "[ \"${"$"}{extDisplay:-0}\" = \"1\" ]"
+                         else
+                           "false"
+                       ) conds
+                     );
 
-                   closeArgs = lib.concatStringsSep " " (map lib.escapeShellArg closeCmds);
-                   openArgs = lib.concatStringsSep " " (map lib.escapeShellArg openCmds);
-                 in
-                 # sh
-                 ''
-                   if ${condExpr}; then
-                   	log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
-                   	run_cmd_list ${closeArgs}
-                   	store_open_cmds ${openArgs}
-                   	return 0
-                   fi
-                 ''
-               ) cfg.rules
-             )
-           }
+                 closeArgs = lib.concatStringsSep " " (map lib.escapeShellArg closeCmds);
+                 openArgs = lib.concatStringsSep " " (map lib.escapeShellArg openCmds);
+               in
+               # sh
+               ''
+                 if ${condExpr}; then
+                 	log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
+                 	run_cmd_list ${closeArgs}
+                 	store_open_cmds ${openArgs}
+                 	return 0
+                 fi
+               ''
+             ) cfg.rules
+           )
+         }
 
         	${
-             lib.optionalString (cfg.lidClosedDefaultCmd != ":") # sh
-               ''log "lidClosed no condition matched; using default" ''
-           }
+           lib.optionalString (cfg.lidClosedDefaultCmd != ":") # sh
+             ''log "lidClosed no condition matched; using default" ''
+         }
 
         	run_cmd_list ${lib.escapeShellArg cfg.lidClosedDefaultCmd}
         	return 0
@@ -380,7 +431,7 @@ in
         Directory holding event files written by the lidmond system service.
 
         Must match nixSpace.laptop.lidmond's own runtime directory. Nothing
-        checks that the two agree, and a mismatch presents as the agent waiting
+        checks the two agree — a mismatch presents as the agent waiting
         forever with the "still waiting" message.
       '';
     };
@@ -414,7 +465,7 @@ in
       type = lib.types.str;
       default = ":";
       description = ''
-        Command run on lidOpened, after any stored open commands.
+        Command run on lidOpened, AFTER any stored open commands.
 
         Note this is not symmetric with lidClosedDefaultCmd: it runs
         unconditionally rather than only when nothing else did.
@@ -430,8 +481,8 @@ in
 
         Auto-detection matches an eDP- or LVDS- prefix, then falls back to a
         lone disabled monitor. The result is cached, because a disabled panel
-        does not appear in hyprctl output, without the cache, the name needed
-        to re-enable it would be unavailable.
+        does not appear in hyprctl output — without the cache, the name needed
+        to re-enable it would be unavailable exactly when it is needed.
       '';
     };
 
@@ -468,7 +519,7 @@ in
         them most specific first.
 
         openCmd is deferred rather than evaluated at open time because the
-        docked state is known at close, but by the time the lid opens, the
+        docked state is known at CLOSE — by the time the lid opens, the
         external display may already be gone.
 
         Two internal switches are recognised alongside shell commands:
