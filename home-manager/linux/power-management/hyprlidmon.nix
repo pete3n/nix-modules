@@ -732,30 +732,29 @@ in
                   "extDisplay"
                 ]
               );
-              default = [
-                "extPower"
-                "extDisplay"
-              ];
               description = "Conditions, ANDed together.";
             };
             closeCmd = lib.mkOption {
               type = lib.types.listOf lib.types.str;
-              default = [
-                "--int-display-disable"
-              ];
               description = "Commands run when this rule matches on lidClosed.";
             };
             openCmd = lib.mkOption {
               type = lib.types.listOf lib.types.str;
-              default = [
-                "--int-display-enable"
-              ];
               description = "Commands stored at close time and run on the next lidOpened.";
             };
           };
         }
       );
-      default = [ ];
+      default = [
+        {
+          cond = [
+            "extPower"
+            "extDisplay"
+          ];
+          closeCmd = [ "--int-display-disable" ];
+          openCmd = [ "--int-display-enable" ];
+        }
+      ];
       description = ''
         Rules evaluated on lidClosed, in order. First match wins, so order
         them most specific first.
