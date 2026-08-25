@@ -194,33 +194,16 @@ let
         EVENT_DIR=${cfg.eventDir}
         POLL=${toString cfg.pollIntervalSeconds}
 
-        STATE_DIR="''${XDG_STATE_HOME:-$HOME/.local/state}/hyprlidmon"
-        LAST_FILE="$STATE_DIR/last_seen"
-        OPEN_CMDS_FILE="$STATE_DIR/open_cmds"
-
-        ${coreutils}/mkdir -p "$STATE_DIR"
-        [ -e "$OPEN_CMDS_FILE" ] || : > "$OPEN_CMDS_FILE"
-
-        INT_CFG=${cfg.intDisplay}
-        INT_DISP_FILE="$STATE_DIR/int_display"
-        INT_DISP_DISABLED_FILE="$STATE_DIR/int_display_disabled"
-
-        # Empty until get_internal resolves it below. The previous version
-        # initialised this to cfg.intDisplay, so before resolution it held the
-        # literal string "auto" and have_external's `[ -z "$INT_DISP" ]`
-        # guard does not catch that, so a reordering would have compared
-        # monitor names against "auto" instead of failing cleanly.
+        # STATE_DIR, INT_DISP_FILE, the mkdir, and the instance-signature
+        # resolution all come from stateFunctions below — they were duplicated
+        # here after the merge with hypr-suspend-blocker. Only the files this
+        # script alone uses are declared locally.
+        #
+        # INT_DISP starts EMPTY, not at cfg.intDisplay: the literal string
+        # "auto" would pass the `[ -z "$INT_DISP" ]` guards that are supposed
+        # to catch an unresolved name, so those checks would silently compare
+        # monitor names against "auto".
         INT_DISP=""
-
-        # Hyprland moved its runtime directory to $XDG_RUNTIME_DIR/hypr; the
-        # old /tmp/hypr path finds nothing on current versions.
-        if [ -z "''${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
-        	_hyprdir="''${XDG_RUNTIME_DIR:-/run/user/$(${coreutils}/id -u)}/hypr"
-        	if [ -d "$_hyprdir" ]; then
-        		_sig="$(${coreutils}/ls -t "$_hyprdir" 2>/dev/null | ${coreutils}/head -n1 || true)"
-        		[ -n "''${_sig:-}" ] && export HYPRLAND_INSTANCE_SIGNATURE="''${_sig}"
-        	fi
-        fi
 
         ts=""
         event=""
@@ -241,6 +224,14 @@ let
         }
 
         ${stateFunctions}
+
+        # Declared after stateFunctions because they derive from STATE_DIR,
+        # which it sets.
+        LAST_FILE="$STATE_DIR/last_seen"
+        OPEN_CMDS_FILE="$STATE_DIR/open_cmds"
+        INT_DISP_DISABLED_FILE="$STATE_DIR/int_display_disabled"
+
+        [ -e "$OPEN_CMDS_FILE" ] || : > "$OPEN_CMDS_FILE"
 
         # have_external wraps the shared check_external_disp, which prints
         # connected|none|unknown, into a boolean. "unknown" counts as no
