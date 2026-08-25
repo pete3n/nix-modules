@@ -17,9 +17,14 @@
 let
   cfg = config.services.hyprlidmon;
 
-  # hyprctl must come from the compositor that is running, not from whichever
-  # Hyprland nixpkgs happens to package.
-  hyprPkg = config.wayland.windowManager.hyprland.finalPackage or pkgs.hyprland;
+  # `or pkgs.hyprland` does NOT help here: finalPackage EXISTS and is null
+  # when the preset sets package = null (the system provides the compositor).
+  # `or` tests attribute presence, not nullness.
+  hyprPkg =
+    if config.wayland.windowManager.hyprland.finalPackage != null then
+      config.wayland.windowManager.hyprland.finalPackage
+    else
+      pkgs.hyprland;
   hyprctl = "${hyprPkg}/bin/hyprctl";
 
   coreutils = "${pkgs.coreutils}/bin";
