@@ -1,9 +1,9 @@
 # Hyprland user agent for laptop lid events.
 #
-# Companion to the lidmond SYSTEM service: lidmond watches the ACPI lid state
+# Companion to the lidmond system-module service: lidmond watches the ACPI lid state
 # as root and writes event files; this agent reads them inside the Hyprland
 # session and acts on them. The split exists because reading /proc/acpi needs
-# root while hyprctl needs the user's session — neither side can do both.
+# root while hyprctl needs the user's session.
 #
 # The event files are the interface. This module does not talk to lidmond
 # directly, so a different producer writing the same format would work.
@@ -17,11 +17,8 @@
 let
   cfg = config.services.hyprlidmon;
 
-  # hyprctl must come from the compositor that is RUNNING, not from whichever
-  # Hyprland nixpkgs happens to package. The previous version used
-  # pkgs.hyprland unconditionally — with a pinned or overlaid compositor those
-  # differ, and version-skewed hyprctl against a live instance fails in ways
-  # that read as the socket being wrong.
+  # hyprctl must come from the compositor that is running, not from whichever
+  # Hyprland nixpkgs happens to package.
   hyprPkg = config.wayland.windowManager.hyprland.finalPackage or pkgs.hyprland;
   hyprctl = "${hyprPkg}/bin/hyprctl";
 
@@ -33,15 +30,30 @@ let
       ''
         set -eu
 
-        i=0
-        printf "hyprlidmon: waiting for lidmond (${cfg.eventDir})...\n" >&2
-        while [ ! -d ${cfg.eventDir} ]; do
-        	i=$((i+1))
-        	if [ "$i" -eq 6 ]; then
-        		printf "hyprlidmon: still waiting. Ensure the lidmond system service is enabled\n" >&2
-        		i=0 # Warn every 30 seconds
+        EVENT_DIR=${cfg.eventDir}
+        TIMEOUT=${toString cfg.waitTimeoutSeconds}
+        INTERVAL=5
+
+        # The event directory only exists if the lidmond SYSTEM service is
+        # running, and home-manager cannot assert on NixOS config, so a
+        # missing system service is not catchable at build time.
+        _waited=0
+        while [ ! -d "$EVENT_DIR" ]; do
+        	if [ "$TIMEOUT" -gt 0 ] && [ "$_waited" -ge "$TIMEOUT" ]; then
+        		printf "hyprlidmon: %s never appeared after %ss.\n" "$EVENT_DIR" "$TIMEOUT" >&2
+        		printf "hyprlidmon: the lidmond system-module service provides it. Enable it with:\n" >&2
+        		printf "hyprlidmon:   nixSpace.laptop.lidmond.enable = true;\n" >&2
+        		printf "hyprlidmon: if it is enabled, check that its runtime directory matches\n" >&2
+        		printf "hyprlidmon: services.hyprlidmon.eventDir (currently %s).\n" "$EVENT_DIR" >&2
+        		exit 1
         	fi
-        	${coreutils}/sleep 5
+
+        	if [ "$_waited" -gt 0 ] && [ $((_waited % 30)) -eq 0 ]; then
+        		printf "hyprlidmon: still waiting for %s (%ss elapsed)\n" "$EVENT_DIR" "$_waited" >&2
+        	fi
+
+        	${coreutils}/sleep "$INTERVAL"
+        	_waited=$((_waited + INTERVAL))
         done
       '';
 
@@ -109,7 +121,7 @@ let
         	' 2>/dev/null)" || true
         	[ -n "''${_int:-}" ] && printf '%s\n' "$_int" && return 0
 
-        	# Fallback: exactly one DISABLED monitor is probably the internal
+        	# Fallback: exactly one disabled monitor is probably the internal
         	# panel, since that is the state this agent leaves it in when docked.
         	_int="$(printf '%s' "$_mons" \
         			| ${jq} -r '
@@ -127,7 +139,7 @@ let
         		return 0
         	fi
 
-        	# Trust the cache unconditionally: the internal panel may be ABSENT
+        	# Trust the cache unconditionally: the internal panel may be absent
         	# from hyprctl output while disabled (docked, lid closed), so
         	# re-detecting at that moment would fail and lose the name needed to
         	# re-enable it.
@@ -153,30 +165,14 @@ let
 
         # Apply a monitor change and report whether it took.
         #
-        # `hyprctl keyword` is LEGACY-PARSER ONLY. Under a Lua config it
+        # `hyprctl keyword` is hyprlang. Under a Lua config it
         # refuses outright with "keyword can't work with non-legacy parsers"
-        # — and the previous version discarded that message with
-        # `>/dev/null 2>&1 || true`, then wrote the state flag anyway. The
-        # disable silently never happened while the flag claimed it had, so
-        # the startup restore logic acted on a lie.
-        #
         # `hyprctl eval` takes a Lua expression instead.
-        #
-        # ON `set -e`: the assignment is its own statement and the `|| true`
-        # keeps a non-zero hyprctl exit from killing the agent. Do NOT fold
-        # this into `if _out="$(...)"; then` — a command substitution failing
-        # inside a condition is fine, but the pattern invites someone to drop
-        # the guard later. The exit status is deliberately ignored in favour
-        # of inspecting the OUTPUT, because hyprctl exits 0 while printing an
-        # error for at least this case.
         apply_monitor() {
         	_spec="$1"
         	_out=""
         	_out="$(${hyprctl} eval "$_spec" 2>&1)" || true
 
-        	# Only an explicit "ok" counts. Empty output was previously treated
-        	# as success too, which would mask a spec that parsed but did
-        	# nothing — the exact failure this function exists to surface.
         	case "''${_out}" in
         		ok*)
         			return 0
@@ -199,10 +195,10 @@ let
         	fi
         	log "disabling internal display: $INT_DISP"
 
-        	# The flag is written ONLY on success. It records what the display
+        	# The flag is written only on success. It records what the display
         	# state actually is, and startup restore reads it to decide whether
-        	# to re-apply the disable — a flag written after a failed call would
-        	# make that decision on false information.
+        	# to re-apply the disable. A flag written after a failed call would
+        	# make that decision on stale state information.
         	if apply_monitor "hl.monitor({ output = '"$INT_DISP"', disabled = true })"; then
         		${coreutils}/touch "$INT_DISP_DISABLED_FILE"
         	else
@@ -217,20 +213,9 @@ let
         	fi
         	log "enabling internal display: $INT_DISP"
 
-        	# The flag is cleared UNCONDITIONALLY, unlike the disable case.
+        	# The flag is cleared unconditionally, unlike the disable case.
         	# A stale flag after a failed enable would make startup restore
-        	# re-disable a panel the user is trying to get back — the failure
-        	# mode of clearing it wrongly is a redundant enable attempt, which
-        	# is harmless.
-        	#
-        	# `disabled = false` explicitly, mirroring the disable call. A
-        	# monitor spec MERGES rather than replacing, so omitting the field
-        	# leaves the panel disabled — the previous form set mode, position
-        	# and scale, reported "ok", and changed nothing visible.
-        	#
-        	# Restating mode/position/scale would also override whatever the
-        	# user declared for this output in their monitor settings. Toggling
-        	# only the field this module owns leaves the rest intact.
+        	# re-disable a panel the user is trying to get back.
         	apply_monitor "hl.monitor({ output = '"$INT_DISP"', disabled = false })" || true
         	${coreutils}/rm -f "$INT_DISP_DISABLED_FILE"
         }
@@ -452,6 +437,22 @@ in
       '';
     };
 
+    waitTimeoutSeconds = lib.mkOption {
+      type = lib.types.int;
+      default = 60;
+      description = ''
+        How long to wait for the lidmond event directory before failing.
+
+        The agent is useless without it, and lidmond is a SYSTEM service this
+        module cannot check for at build time. Failing after a bounded wait
+        makes a missing or misconfigured lidmond visible as a failed unit
+        rather than as one that is active and silently doing nothing.
+
+        Zero waits indefinitely — only sensible if lidmond is known to start
+        much later than the session.
+      '';
+    };
+
     pollIntervalSeconds = lib.mkOption {
       type = lib.types.number;
       default = 1;
@@ -572,14 +573,24 @@ in
         Description = "lidmond Hyprland user agent";
         After = [ "hyprland-session.target" ];
         PartOf = [ "hyprland-session.target" ];
+
+        # Paired with Restart = "on-failure" below: three failures inside ten
+        # minutes and systemd stops retrying, leaving the unit in `failed`
+        # where a status check will show it.
+        StartLimitIntervalSec = 600;
+        StartLimitBurst = 3;
       };
       Service = {
         Type = "simple";
         ExecStart = "${hyprlidmonWrapper}/bin/hyprlidmon-wrapper";
-        Restart = "always";
-        RestartSec = 1;
 
-        # PassEnvironment forwards from SYSTEMD's environment, which only has
+				# StartLimit lets systemd give up: after 3 failures in 10 minutes the
+        # unit enters `failed` and stays there, so `systemctl --user status`
+        # reports the problem instead of an endlessly restarting service.
+        Restart = "on-failure";
+        RestartSec = 10;
+
+        # PassEnvironment forwards from systemd's environment, which only has
         # these after Hyprland's start hook runs
         # dbus-update-activation-environment. A service starting before that
         # import gets nothing — which is why the agent also resolves the
