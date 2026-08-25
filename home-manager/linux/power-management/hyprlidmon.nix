@@ -89,14 +89,14 @@ let
 
         log() {
         	${
-           if cfg.logToJournal then
-             ''printf "hyprlidmon: %s\n" "$*" >&2''
-           else
-             # A function body cannot be empty in POSIX sh. The previous
-             # version emitted `log() { }` when logging was disabled, which
-             # is a parse error — the agent failed to start at all.
-             ":"
-         }
+             if cfg.logToJournal then
+               ''printf "hyprlidmon: %s\n" "$*" >&2''
+             else
+               # A function body cannot be empty in POSIX sh. The previous
+               # version emitted `log() { }` when logging was disabled, which
+               # is a parse error — the agent failed to start at all.
+               ":"
+           }
         }
 
         # Best-effort internal panel detection, first match wins.
@@ -174,9 +174,16 @@ let
         	_out=""
         	_out="$(${hyprctl} eval "$_spec" 2>&1)" || true
 
+        	# Only an explicit "ok" counts. Empty output was previously treated
+        	# as success too, which would mask a spec that parsed but did
+        	# nothing — the exact failure this function exists to surface.
         	case "''${_out}" in
-        		ok*|"")
+        		ok*)
         			return 0
+        			;;
+        		"")
+        			log "hyprctl eval returned nothing (compositor unreachable?)"
+        			return 1
         			;;
         		*)
         			log "hyprctl eval failed: ''${_out}"
@@ -215,7 +222,16 @@ let
         	# re-disable a panel the user is trying to get back — the failure
         	# mode of clearing it wrongly is a redundant enable attempt, which
         	# is harmless.
-        	apply_monitor "hl.monitor({ output = '"$INT_DISP"', mode = 'preferred', position = 'auto', scale = 1 })" || true
+        	#
+        	# `disabled = false` explicitly, mirroring the disable call. A
+        	# monitor spec MERGES rather than replacing, so omitting the field
+        	# leaves the panel disabled — the previous form set mode, position
+        	# and scale, reported "ok", and changed nothing visible.
+        	#
+        	# Restating mode/position/scale would also override whatever the
+        	# user declared for this output in their monitor settings. Toggling
+        	# only the field this module owns leaves the rest intact.
+        	apply_monitor "hl.monitor({ output = '"$INT_DISP"', disabled = false })" || true
         	${coreutils}/rm -f "$INT_DISP_DISABLED_FILE"
         }
 
@@ -291,50 +307,50 @@ let
         	log "extDisplay=$extDisplay"
 
         	${
-           lib.concatStringsSep "\n" (
-             map (
-               rule:
-               let
-                 conds = rule.cond or [ ];
-                 closeCmds = rule.closeCmd or [ ];
-                 openCmds = rule.openCmd or [ ];
+             lib.concatStringsSep "\n" (
+               map (
+                 rule:
+                 let
+                   conds = rule.cond or [ ];
+                   closeCmds = rule.closeCmd or [ ];
+                   openCmds = rule.openCmd or [ ];
 
-                 condExpr =
-                   if conds == [ ] then
-                     "true"
-                   else
-                     lib.concatStringsSep " && " (
-                       map (
-                         cond:
-                         if cond == "extPower" then
-                           "[ \"${"$"}{extPower:-0}\" = \"1\" ]"
-                         else if cond == "extDisplay" then
-                           "[ \"${"$"}{extDisplay:-0}\" = \"1\" ]"
-                         else
-                           "false"
-                       ) conds
-                     );
+                   condExpr =
+                     if conds == [ ] then
+                       "true"
+                     else
+                       lib.concatStringsSep " && " (
+                         map (
+                           cond:
+                           if cond == "extPower" then
+                             "[ \"${"$"}{extPower:-0}\" = \"1\" ]"
+                           else if cond == "extDisplay" then
+                             "[ \"${"$"}{extDisplay:-0}\" = \"1\" ]"
+                           else
+                             "false"
+                         ) conds
+                       );
 
-                 closeArgs = lib.concatStringsSep " " (map lib.escapeShellArg closeCmds);
-                 openArgs = lib.concatStringsSep " " (map lib.escapeShellArg openCmds);
-               in
-               # sh
-               ''
-                 if ${condExpr}; then
-                 	log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
-                 	run_cmd_list ${closeArgs}
-                 	store_open_cmds ${openArgs}
-                 	return 0
-                 fi
-               ''
-             ) cfg.rules
-           )
-         }
+                   closeArgs = lib.concatStringsSep " " (map lib.escapeShellArg closeCmds);
+                   openArgs = lib.concatStringsSep " " (map lib.escapeShellArg openCmds);
+                 in
+                 # sh
+                 ''
+                   if ${condExpr}; then
+                   	log "lidClosed matched cond=${lib.escapeShellArg (builtins.toJSON conds)}"
+                   	run_cmd_list ${closeArgs}
+                   	store_open_cmds ${openArgs}
+                   	return 0
+                   fi
+                 ''
+               ) cfg.rules
+             )
+           }
 
         	${
-           lib.optionalString (cfg.lidClosedDefaultCmd != ":") # sh
-             ''log "lidClosed no condition matched; using default" ''
-         }
+             lib.optionalString (cfg.lidClosedDefaultCmd != ":") # sh
+               ''log "lidClosed no condition matched; using default" ''
+           }
 
         	run_cmd_list ${lib.escapeShellArg cfg.lidClosedDefaultCmd}
         	return 0
