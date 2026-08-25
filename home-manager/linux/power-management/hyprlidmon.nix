@@ -694,7 +694,9 @@ in
         )
       );
       default = [
-        "extPower"
+        [
+          "extPower"
+        ]
       ];
       example = [
         [ "extPower" ]
