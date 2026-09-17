@@ -1,4 +1,5 @@
 # Pete3n's Nix Module Repository
+# This repo has been deprecated. See the nix-space project for the current state of these modules.
 This is a collection of my more polished Nix modules for NixOS, Nix-Darwin, 
 and Nix Home-manager, taken from my [make-nix](https://github.com/pete3n/make-nix) config.
 
